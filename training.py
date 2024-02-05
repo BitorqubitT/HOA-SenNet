@@ -18,6 +18,11 @@ from glob import glob
 p_augm = 0.05 #0.5
 #add rotate.  less p_augm
 
+# TODO:
+# Put all helper files and config in different file?
+# Check different params
+# Maybe split preprocessing
+
 class CFG:
     # ============== pred target =============
     target_size = 1
@@ -107,6 +112,7 @@ def to_1024(img , image_size = 1024):
 def to_1024_no_rot(img, image_size = 1024):
     if image_size > img.shape[0]:  
        start1 = ( image_size - img.shape[0])//2
+       # check this 
        top =     img[0                    : start1,   0: img.shape[1] ]
        bottom  = img[img.shape[0] -start1 : img.shape[0],   0 : img.shape[1] ]
        img_result = np.concatenate((top,img,bottom ),axis=0)
@@ -134,8 +140,7 @@ def to_original ( im_after, img, image_size = 1024 ):
              img_result = im_after
     return img_result  
 
-
-# Functionssssssssss
+# Put these functions in helper?
 def min_max_normalization(x:tc.Tensor)->tc.Tensor:
     """input.shape=(batch,f1,...)"""
     shape=x.shape
@@ -333,18 +338,18 @@ print(val_y.shape)
 tc.backends.cudnn.enabled = True
 tc.backends.cudnn.benchmark = True
     
-train_dataset=Kaggld_Dataset(train_x,train_y,arg=True)
+train_dataset = Kaggld_Dataset(train_x,train_y,arg=True)
 train_dataset = DataLoader(train_dataset, batch_size=CFG.train_batch_size ,num_workers=2, shuffle=True, pin_memory=True)
-val_dataset=Kaggld_Dataset([val_x],[val_y])
+val_dataset = Kaggld_Dataset([val_x],[val_y])
 val_dataset = DataLoader(val_dataset, batch_size=CFG.valid_batch_size, num_workers=2, shuffle=False, pin_memory=True)
 
-model=build_model()
-model=DataParallel(model)
+model = build_model()
+model = DataParallel(model)
 
-loss_fc=DiceLoss()
+loss_fc = DiceLoss()
 #loss_fn=nn.BCEWithLogitsLoss()
-optimizer=tc.optim.AdamW(model.parameters(),lr=CFG.lr)
-scaler=tc.cuda.amp.GradScaler()
+optimizer = tc.optim.AdamW(model.parameters(),lr=CFG.lr)
+scaler = tc.cuda.amp.GradScaler()
 scheduler = tc.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=CFG.lr,
                                                 steps_per_epoch=len(train_dataset), epochs=CFG.epochs+1,
                                                 pct_start=0.1,)

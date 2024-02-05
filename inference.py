@@ -64,10 +64,8 @@ class CustomModel(nn.Module):
     def __init__(self, CFG, weight=None):
         super().__init__()
         
-        # Storing configuration parameters within the model
         self.CFG = CFG
         
-        # Creating an instance of the Unet model from segmentation_models_pytorch
         self.model = smp.Unet(
             encoder_name=CFG.backbone, 
             encoder_weights=weight,
@@ -109,7 +107,6 @@ class CustomModel(nn.Module):
                 # Concatenating the results along the batch dimension
                 x = tc.cat(x, dim=0)
         
-        # Applying sigmoid activation and reshaping the tensor
         x = x.sigmoid()
         x = x.reshape(4, shape[0], *shape[2:])
         
@@ -324,6 +321,9 @@ class Pipeline_Dataset(Dataset):
         return ids
 
 
+# Load both models and then combine the results
+# Fix all these paths, they are different from my kaggle directory 
+
 # Building and loading the 1024 x 1024 Image Model
 model = build_model()  # Creating an instance of the model
 model.load_state_dict(tc.load(CFG.model_path[model_path_i], "cpu"))  # Loading the pre-trained weights
@@ -463,7 +463,6 @@ print(TH)
 # Read an example image for visualization
 img = cv2.imread("/kaggle/input/blood-vessel-segmentation/test/kidney_5/images/0001.tif", cv2.IMREAD_GRAYSCALE)
 
-# Initialize a list for submission dataframe
 submission_df = []
 debug_count = 0
 
