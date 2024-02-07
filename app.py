@@ -19,28 +19,26 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
 server = app.server
 # TODO:
-# check how the input from a button is given
-# Chek how they define a model then put it in a button and update it
-# Maybe just wrap my code in a function and put that underneath a callback
+# Optimise code (when to load img etc)
+# Good param ranges>
 
-# check populate_bigram_scatter for this
-# line 724 -> perplexity>??????
-
-# Add two buttons for the histogram
+# Add more usefull buttons
+# Fix position
 
 # Cleanup code, (format, remove useless stuff)
 
 # Add other graphs (A way to view and compare mask, training slices?)
 # Other graph shows score?
 
-# remove these timers 
-
 # ------------- Define App Layout ---------------------------------------------------
 mesh_card = dbc.Card(
-    [
+    [ dcc.Loading(
+        children = [
         dbc.CardHeader("3D mesh representation of the image data and annotation"),
-        dbc.CardBody([dcc.Graph(id="graph-helper")]),
+        dcc.Graph(id="graph-helper"),
         #dbc.CardBody([dcc.Graph(id="graph-helper", figure=fig_mesh)]),
+        ]
+    )
     ]
 )
 
@@ -49,7 +47,7 @@ mesh_card = dbc.Card(
 button_stepsize = dcc.Dropdown(
     id = "set_stepsize",
     options = [{"label": str(i), "value": i}
-               for i in range(3, 7)
+               for i in range(1, 10)
               ],
     value=3,
 )
@@ -87,7 +85,6 @@ nav_bar = dbc.Navbar(
     dark=True,
 )
 
-
 # We can put a body in here, the define the body above which holds: buttons and graph
 app.layout = html.Div(
     [
@@ -104,17 +101,16 @@ app.layout = html.Div(
     ],
 )
 
-
-
 # ------------- Define App Interactivity ---------------------------------------------------
 @app.callback(
     Output("graph-helper", "figure"), [Input("set_stepsize", "value")],
 )
 def create_histo(step_size):
     # Is there  a way to compute this on gpu?
+    # Can also put this in top function and call the function every time a param is udpated
     labels_folder_path = 'D:/data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
     label_images = []
-    for file in sorted(os.listdir(labels_folder_path))[200:800]:
+    for file in sorted(os.listdir(labels_folder_path))[100:900]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
             label_image_downsampled = label_image[::1, ::1]
@@ -137,32 +133,8 @@ def create_histo(step_size):
     x, y, z = verts.T
     i, j, k = faces.T
     fig = go.Figure()
-    fig.update_traces(go.Mesh3d(x=z, y=y, z=x, opacity=0.2, i=k, j=j, k=i))
+    fig.add_trace(go.Mesh3d(x=z, y=y, z=x, opacity=0.2, i=k, j=j, k=i))
     return fig
-
-app.clientside_callback(
-    """
-function(surf, fig){
-        let fig_ = {...fig};
-        fig_.data[1] = surf;
-        return fig_;
-    }
-""",
-    output=Output("graph-helper", "figure"),
-    inputs=[Input("occlusion-surface", "data"),],
-    state=[State("graph-helper", "figure"),],
-)
-
-@app.callback(
-    Output("modal", "is_open"),
-    [Input("howto-open", "n_clicks"), Input("howto-close", "n_clicks")],
-    [State("modal", "is_open")],
-)
-def toggle_modal(n1, n2, is_open):
-    if n1 or n2:
-        return not is_open
-    return is_open
-
 
 if __name__ == "__main__":
     app.run_server(debug=True, dev_tools_props_check=False)
