@@ -44,26 +44,6 @@ mesh_card = dbc.Card(
     ]
 )
 
-# Buttons
-# Can I remove these buttons?
-button_gh = dbc.Button(
-    "Learn more",
-    id="howto-open",
-    outline=True,
-    color="secondary",
-    # Turn off lowercase transformation for class .button in stylesheet
-    style={"textTransform": "none"},
-)
-
-button_howto = dbc.Button(
-    "View Code on github",
-    outline=True,
-    color="primary",
-    href="https://github.com/plotly/dash-sample-apps/tree/master/apps/dash-covid-xray",
-    id="gh-link",
-    style={"text-transform": "none"},
-)
-
 # New button which holds params that can alter the processing of the image
 # Check other app, might need to set col + html title 
 button_stepsize = dcc.Dropdown(
