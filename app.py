@@ -42,6 +42,28 @@ mesh_card = dbc.Card(
     ]
 )
 
+# show picture of liver
+liver_card = dbc.Card(
+    [ dcc.Loading(
+        children = [
+        dbc.CardHeader("2D slices of liver"),
+        dcc.Graph(id="graph-liver"),
+        ]
+    )
+    ]
+)
+
+# show masked of liver
+mask_card = dbc.Card(
+    [ dcc.Loading(
+        children = [
+        dbc.CardHeader("2D mask of liver"),
+        dcc.Graph(id="graph-liver-msk"),
+        ]
+    )
+    ]
+)
+
 # New button which holds params that can alter the processing of the image
 # Check other app, might need to set col + html title 
 button_stepsize = dcc.Dropdown(
@@ -60,6 +82,10 @@ button_threshold = dcc.Dropdown(
     value=200,
 )
 
+# create two buttons for liver pic
+
+
+# remove navbar
 nav_bar = dbc.Navbar(
     dbc.Container(
         [
