@@ -52,6 +52,14 @@ button_stepsize = dcc.Dropdown(
     value=3,
 )
 
+button_threshold = dcc.Dropdown(
+    id = "set_threshold",
+    options = [{"label": str(i), "value": i}
+               for i in range(100, 300, 100)
+              ],
+    value=200,
+)
+
 nav_bar = dbc.Navbar(
     dbc.Container(
         [
@@ -91,8 +99,12 @@ app.layout = html.Div(
         nav_bar,
         dbc.Container(
             [
+                dbc.Row([dbc.Col(html.P(["Choose a step_size:"])),
+                         dbc.Col([dbc.Col(button_stepsize),]),
+                         dbc.Col(html.P(["Choose a threshold"])),
+                         dbc.Col([dbc.Col(button_threshold),])
+                         ]),
                 dbc.Row([dbc.Col(mesh_card),]),
-                dbc.Row([dbc.Col(button_stepsize),]),
             ],
             fluid=True,
         ),
@@ -103,9 +115,10 @@ app.layout = html.Div(
 
 # ------------- Define App Interactivity ---------------------------------------------------
 @app.callback(
-    Output("graph-helper", "figure"), [Input("set_stepsize", "value")],
+    Output("graph-helper", "figure"),
+    [Input("set_stepsize", "value"), Input("set_threshold", "value")],
 )
-def create_histo(step_size):
+def create_histo(step_size, threshold):
     # Is there  a way to compute this on gpu?
     # Can also put this in top function and call the function every time a param is udpated
     labels_folder_path = 'D:/data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
@@ -129,7 +142,7 @@ def create_histo(step_size):
     # Step_size affects the level of detail and 200 is threshold. When volume over this threshold we graph it.
     # Marching cube reduces the data complexity. 
     # Without MC you dont have any surface roconstruction or isosurface extraction
-    verts, faces, _, _ = measure.marching_cubes(med_img, 200, step_size=step_size)
+    verts, faces, _, _ = measure.marching_cubes(med_img, threshold, step_size=step_size)
     x, y, z = verts.T
     i, j, k = faces.T
     fig = go.Figure()
