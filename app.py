@@ -1,5 +1,10 @@
 from time import time
 
+import rasterio
+from rasterio.plot import show
+from PIL import Image
+import matplotlib.pyplot as plt
+
 import numpy as np
 from skimage import draw, filters, exposure, measure
 from scipy import ndimage
@@ -23,12 +28,26 @@ server = app.server
 # Good param ranges>
 
 # Add more usefull buttons
+# Fix size of everything
 # Fix position
 
 # Cleanup code, (format, remove useless stuff)
 
+# Draw a slice through 3d image, so we know where we are
+
 # Add other graphs (A way to view and compare mask, training slices?)
 # Other graph shows score?
+
+# Can add another row for the predicted label
+# Show score
+# Graph score per slice?
+
+
+# Check .nii file
+# Should i just load 3d matrix the go over it with slider?
+# Does it fit in memory?
+# other methods?
+
 
 # ------------- Define App Layout ---------------------------------------------------
 mesh_card = dbc.Card(
@@ -64,6 +83,22 @@ mask_card = dbc.Card(
     ]
 )
 
+# check effect of resizing
+# Check if I can implement this similar to the rest
+
+labels_folder_path = 'D:/data/train/kidney_1_dense/images/'  # Adjust the path accordingly
+label_images = []
+for file in sorted(os.listdir(labels_folder_path))[600:950]:
+    if file.endswith(".tif"):
+        label_image = tifffile.imread(os.path.join(labels_folder_path, file))
+        print(label_image.shape)
+        label_images.append(label_image)
+# Combine the first 100 images into one 3D tensor
+x = np.array(label_images)
+slicer2 = VolumeSlicer(app, x)
+slicer2.graph.config["scrollZoom"] = False
+
+
 # New button which holds params that can alter the processing of the image
 # Check other app, might need to set col + html title 
 button_stepsize = dcc.Dropdown(
@@ -82,47 +117,18 @@ button_threshold = dcc.Dropdown(
     value=200,
 )
 
-# create two buttons for liver pic
-
-
-# remove navbar
-nav_bar = dbc.Navbar(
-    dbc.Container(
-        [
-            dbc.Row(
-                [
-                    dbc.Col(
-                        dbc.Row(
-                            [
-                                dbc.Col(
-                                    html.Div(
-                                        [
-                                            html.H3("Covid X-Ray app"),
-                                            html.P(
-                                                "Exploration and annotation of CT images"
-                                            ),
-                                        ],
-                                        id="app_title",
-                                    )
-                                ),
-                            ],
-                            align="center",
-                            style={"display": "inline-flex"},
-                        )
-                    ),
-                ]
-            ),
-        ],
-        fluid=True,
-    ),
-    color="dark",
-    dark=True,
+button_pickslice = dcc.Dropdown(
+    id = "set_slice",
+    options = [{"label": str(i), "value": i}
+               for i in range(1000, 1003, 1)
+              ],
+    value=1100,
 )
+# create two buttons for liver pic
 
 # We can put a body in here, the define the body above which holds: buttons and graph
 app.layout = html.Div(
     [
-        nav_bar,
         dbc.Container(
             [
                 dbc.Row([dbc.Col(html.P(["Choose a step_size:"])),
@@ -131,11 +137,20 @@ app.layout = html.Div(
                          dbc.Col([dbc.Col(button_threshold),])
                          ]),
                 dbc.Row([dbc.Col(mesh_card),]),
+                dbc.Row([dbc.Col(html.P(["Choose a slice to inspect:"])),
+                         dbc.Col([dbc.Col(button_pickslice),])
+                        ]),
+                dbc.Row([dbc.Col(liver_card),
+                         dbc.Col(mask_card)
+                        ]),                     
+                dbc.Row([
+                         dbc.Col(slicer2.slider), 
+                         dbc.Col(slicer2.graph),
+                         *slicer2.stores 
+                        ]),
             ],
             fluid=True,
         ),
-        dcc.Store(id="annotations", data={}),
-        dcc.Store(id="occlusion-surface", data={}),
     ],
 )
 
@@ -157,6 +172,7 @@ def create_histo(step_size, threshold):
 
     # Combine the first 100 images into one 3D tensor
     all_images = torch.stack(label_images, dim=0)
+    print(all_images.shape)
     print("we get here")
     print(step_size)
     # Extract coordinates of non-zero values (assuming binary segmentation)
@@ -173,6 +189,42 @@ def create_histo(step_size, threshold):
     i, j, k = faces.T
     fig = go.Figure()
     fig.add_trace(go.Mesh3d(x=z, y=y, z=x, opacity=0.2, i=k, j=j, k=i))
+    return fig
+
+# Can clean up this code by having 2 outputs in the same callback
+# Dont need two functions then
+# Cleaner way to share the input
+
+@app.callback(
+    Output("graph-liver", "figure"),
+    [Input("set_slice", "value")],
+)
+def create_liver(slice_number):
+    labels_folder_path = 'D:/data/train/kidney_1_dense/images/' + str(slice_number) + '.tif'  # Adjust the path accordingly
+    all_img_types = []
+    with rasterio.open(labels_folder_path) as image:
+        all_img_types.append(image.read())
+    img = all_img_types[0][0]
+    fig = px.imshow(img)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
+    return fig
+
+@app.callback(
+    Output("graph-liver-msk", "figure"),
+    [Input("set_slice", "value")],
+)
+def create_liver_msk(slice_number):
+    labels_folder_path = 'D:/data/train/kidney_1_dense/labels/' + str(slice_number) + '.tif'  # Adjust the path accordingly
+    all_img_types = []
+    with rasterio.open(labels_folder_path) as image:
+        all_img_types.append(image.read())
+    img = all_img_types[0][0]
+    fig = px.imshow(img)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
     return fig
 
 if __name__ == "__main__":
