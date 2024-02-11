@@ -24,10 +24,13 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
 server = app.server
 # TODO:
+
+# dcc? store?
+# check code behind volume slicer
+
 # Optimise code (when to load img etc)
 # Good param ranges>
 
-# Add more usefull buttons
 # Fix size of everything
 # Fix position
 
@@ -42,13 +45,13 @@ server = app.server
 # Show score
 # Graph score per slice?
 
+# check code behind volume slicer
+
 
 # Check .nii file
 # Should i just load 3d matrix the go over it with slider?
 # Does it fit in memory?
 # other methods?
-
-
 # ------------- Define App Layout ---------------------------------------------------
 mesh_card = dbc.Card(
     [ dcc.Loading(
@@ -83,21 +86,31 @@ mask_card = dbc.Card(
     ]
 )
 
+mask_card2 = dbc.Card(
+    [ dcc.Loading(
+        children = [
+        dbc.CardHeader("2D mask of liver"),
+        dcc.Graph(id="graph-liver-msk2"),
+        ]
+    )
+    ]
+)
+
 # check effect of resizing
 # Check if I can implement this similar to the rest
+def pre_load():
+    labels_folder_path = 'D:/data/train/kidney_1_dense/images/'  # Adjust the path accordingly
+    label_images = []
+    for file in sorted(os.listdir(labels_folder_path))[800:950]:
+        if file.endswith(".tif"):
+            label_image = tifffile.imread(os.path.join(labels_folder_path, file))
+            label_image = label_image[0::2, 0::2]
+            label_images.append(label_image)
+    # Combine the first 100 images into one 3D tensor
+    x = np.array(label_images)
+    return x
 
-labels_folder_path = 'D:/data/train/kidney_1_dense/images/'  # Adjust the path accordingly
-label_images = []
-for file in sorted(os.listdir(labels_folder_path))[600:950]:
-    if file.endswith(".tif"):
-        label_image = tifffile.imread(os.path.join(labels_folder_path, file))
-        print(label_image.shape)
-        label_images.append(label_image)
-# Combine the first 100 images into one 3D tensor
-x = np.array(label_images)
-slicer2 = VolumeSlicer(app, x)
-slicer2.graph.config["scrollZoom"] = False
-
+x = pre_load()
 
 # New button which holds params that can alter the processing of the image
 # Check other app, might need to set col + html title 
@@ -124,9 +137,18 @@ button_pickslice = dcc.Dropdown(
               ],
     value=1100,
 )
+
+slider_liver = dcc.Slider(
+    1, 300, 1,
+    id = "slice_slider",
+    value=200,
+    )
+
 # create two buttons for liver pic
 
 # We can put a body in here, the define the body above which holds: buttons and graph
+# might want to use storesssssssssssssss
+
 app.layout = html.Div(
     [
         dbc.Container(
@@ -143,11 +165,9 @@ app.layout = html.Div(
                 dbc.Row([dbc.Col(liver_card),
                          dbc.Col(mask_card)
                         ]),                     
-                dbc.Row([
-                         dbc.Col(slicer2.slider), 
-                         dbc.Col(slicer2.graph),
-                         *slicer2.stores 
-                        ]),
+                dbc.Row([dbc.Col(slider_liver),
+                         dbc.Col(mask_card2)
+                        ]),                     
             ],
             fluid=True,
         ),
@@ -157,9 +177,9 @@ app.layout = html.Div(
 # ------------- Define App Interactivity ---------------------------------------------------
 @app.callback(
     Output("graph-helper", "figure"),
-    [Input("set_stepsize", "value"), Input("set_threshold", "value")],
+    [Input("set_stepsize", "value"), Input("set_threshold", "value"), Input("slice_slider", "value")],
 )
-def create_histo(step_size, threshold):
+def create_histo(step_size, threshold, slice_slider):
     # Is there  a way to compute this on gpu?
     # Can also put this in top function and call the function every time a param is udpated
     labels_folder_path = 'D:/data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
@@ -189,12 +209,29 @@ def create_histo(step_size, threshold):
     i, j, k = faces.T
     fig = go.Figure()
     fig.add_trace(go.Mesh3d(x=z, y=y, z=x, opacity=0.2, i=k, j=j, k=i))
+
+    # add plane
+    # Assuming you have the dimensions of your volume
+    volume_shape = all_images.shape
+
+    # Define the height of the horizontal plane
+    plane_height = volume_shape[0] // 2  # You can adjust this as needed
+    print("slider value is:", slice_slider)
+    print("height is:", plane_height)
+    # Create grid for the plane
+    x_plane, y_plane = np.meshgrid(np.arange(volume_shape[2]), np.arange(volume_shape[1]))
+    z_plane = np.full_like(x_plane, plane_height)
+
+    fig.add_trace(go.Surface(z=z_plane, y=y_plane, x=x_plane, opacity=0.5))
+
     return fig
 
 # Can clean up this code by having 2 outputs in the same callback
 # Dont need two functions then
 # Cleaner way to share the input
 
+# Check what happens if we load the whole image in one go.
+# then only change the slice 
 @app.callback(
     Output("graph-liver", "figure"),
     [Input("set_slice", "value")],
@@ -226,6 +263,20 @@ def create_liver_msk(slice_number):
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
     return fig
+
+@app.callback(
+    Output("graph-liver-msk2", "figure"),
+    [Input("slice_slider", "value")],
+)
+def create_liver_msk2(slice_number):
+    # Find better way to preload
+    img = x[slice_number]
+    fig = px.imshow(img)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
+    return fig
+
 
 if __name__ == "__main__":
     app.run_server(debug=True, dev_tools_props_check=False)
