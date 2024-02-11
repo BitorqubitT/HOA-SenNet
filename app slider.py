@@ -25,12 +25,11 @@ app = dash.Dash(__name__, update_title=None, external_stylesheets=external_style
 server = app.server
 # TODO:
 
+#work with slider and try to up the performance
 # dcc? store?
 # check code behind volume slicer
 
-# Optimise code (when to load img etc)
-# Good param ranges>
-
+# set good param
 # Fix size of everything
 # Fix position
 
@@ -45,13 +44,6 @@ server = app.server
 # Show score
 # Graph score per slice?
 
-# check code behind volume slicer
-
-
-# Check .nii file
-# Should i just load 3d matrix the go over it with slider?
-# Does it fit in memory?
-# other methods?
 # ------------- Define App Layout ---------------------------------------------------
 mesh_card = dbc.Card(
     [ dcc.Loading(
@@ -64,33 +56,31 @@ mesh_card = dbc.Card(
     ]
 )
 
-# show picture of liver
-liver_card = dbc.Card(
+slice_card = dbc.Card(
     [ dcc.Loading(
         children = [
-        dbc.CardHeader("2D slices of liver"),
-        dcc.Graph(id="graph-liver"),
+        dbc.CardHeader("2D slice of kidney"),
+        dcc.Graph(id="graph-kidney"),
         ]
     )
     ]
 )
 
-# show masked of liver
 mask_card = dbc.Card(
     [ dcc.Loading(
         children = [
-        dbc.CardHeader("2D mask of liver"),
-        dcc.Graph(id="graph-liver-msk"),
+        dbc.CardHeader("2D mask of kidney"),
+        dcc.Graph(id="graph-kidney-msk"),
         ]
     )
     ]
 )
 
-mask_card2 = dbc.Card(
+mask_truth_card = dbc.Card(
     [ dcc.Loading(
         children = [
-        dbc.CardHeader("2D mask of liver"),
-        dcc.Graph(id="graph-liver-msk2"),
+        dbc.CardHeader("2D slice of kidney"),
+        dcc.Graph(id="graph-kidney-msk-truth"),
         ]
     )
     ]
@@ -98,7 +88,7 @@ mask_card2 = dbc.Card(
 
 # check effect of resizing
 # Check if I can implement this similar to the rest
-def pre_load():
+def pre_load_image():
     labels_folder_path = 'D:/data/train/kidney_1_dense/images/'  # Adjust the path accordingly
     label_images = []
     for file in sorted(os.listdir(labels_folder_path))[800:950]:
@@ -110,7 +100,20 @@ def pre_load():
     x = np.array(label_images)
     return x
 
-x = pre_load()
+def pre_load_label():
+    labels_folder_path = 'D:/data/train/kidney_1_dense/labels/'  # Adjust the path accordingly
+    label_images = []
+    for file in sorted(os.listdir(labels_folder_path))[800:950]:
+        if file.endswith(".tif"):
+            label_image = tifffile.imread(os.path.join(labels_folder_path, file))
+            label_image = label_image[0::2, 0::2]
+            label_images.append(label_image)
+    # Combine the first 100 images into one 3D tensor
+    x = np.array(label_images)
+    return x
+
+x = pre_load_image()
+xz = pre_load_label()
 
 # New button which holds params that can alter the processing of the image
 # Check other app, might need to set col + html title 
@@ -128,14 +131,6 @@ button_threshold = dcc.Dropdown(
                for i in range(100, 300, 100)
               ],
     value=200,
-)
-
-button_pickslice = dcc.Dropdown(
-    id = "set_slice",
-    options = [{"label": str(i), "value": i}
-               for i in range(1000, 1003, 1)
-              ],
-    value=1100,
 )
 
 slider_liver = dcc.Slider(
@@ -159,15 +154,12 @@ app.layout = html.Div(
                          dbc.Col([dbc.Col(button_threshold),])
                          ]),
                 dbc.Row([dbc.Col(mesh_card),]),
-                dbc.Row([dbc.Col(html.P(["Choose a slice to inspect:"])),
-                         dbc.Col([dbc.Col(button_pickslice),])
+                dbc.Row([dbc.Col(slider_liver), 
+                        ]),                     
+                dbc.Row([dbc.Col(slice_card),
+                         dbc.Col(mask_card),
+                         dbc.Col(mask_truth_card)
                         ]),
-                dbc.Row([dbc.Col(liver_card),
-                         dbc.Col(mask_card)
-                        ]),                     
-                dbc.Row([dbc.Col(slider_liver),
-                         dbc.Col(mask_card2)
-                        ]),                     
             ],
             fluid=True,
         ),
@@ -232,40 +224,9 @@ def create_histo(step_size, threshold, slice_slider):
 
 # Check what happens if we load the whole image in one go.
 # then only change the slice 
-@app.callback(
-    Output("graph-liver", "figure"),
-    [Input("set_slice", "value")],
-)
-def create_liver(slice_number):
-    labels_folder_path = 'D:/data/train/kidney_1_dense/images/' + str(slice_number) + '.tif'  # Adjust the path accordingly
-    all_img_types = []
-    with rasterio.open(labels_folder_path) as image:
-        all_img_types.append(image.read())
-    img = all_img_types[0][0]
-    fig = px.imshow(img)
-    fig.update_layout(coloraxis_showscale=False)
-    fig.update_xaxes(showticklabels=False)
-    fig.update_yaxes(showticklabels=False)
-    return fig
 
 @app.callback(
-    Output("graph-liver-msk", "figure"),
-    [Input("set_slice", "value")],
-)
-def create_liver_msk(slice_number):
-    labels_folder_path = 'D:/data/train/kidney_1_dense/labels/' + str(slice_number) + '.tif'  # Adjust the path accordingly
-    all_img_types = []
-    with rasterio.open(labels_folder_path) as image:
-        all_img_types.append(image.read())
-    img = all_img_types[0][0]
-    fig = px.imshow(img)
-    fig.update_layout(coloraxis_showscale=False)
-    fig.update_xaxes(showticklabels=False)
-    fig.update_yaxes(showticklabels=False)
-    return fig
-
-@app.callback(
-    Output("graph-liver-msk2", "figure"),
+    Output("graph-kidney", "figure"),
     [Input("slice_slider", "value")],
 )
 def create_liver_msk2(slice_number):
@@ -277,6 +238,31 @@ def create_liver_msk2(slice_number):
     fig.update_yaxes(showticklabels=False)
     return fig
 
+@app.callback(
+    Output("graph-kidney-msk", "figure"),
+    [Input("slice_slider", "value")],
+)
+def create_liver_msk2(slice_number):
+    # Find better way to preload
+    img = x[slice_number]
+    fig = px.imshow(img)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
+    return fig
+
+@app.callback(
+    Output("graph-kidney-msk-truth", "figure"),
+    [Input("slice_slider", "value")],
+)
+def create_liver_msk2(slice_number):
+    # Find better way to preload
+    img = xz[slice_number]
+    fig = px.imshow(img)
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
+    return fig
 
 if __name__ == "__main__":
     app.run_server(debug=True, dev_tools_props_check=False)

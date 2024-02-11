@@ -25,28 +25,8 @@ app = dash.Dash(__name__, update_title=None, external_stylesheets=external_style
 server = app.server
 # TODO:
 
-# dcc? store?
-# check code behind volume slicer
-
-# Optimise code (when to load img etc)
-# Good param ranges>
-
-# Fix size of everything
-# Fix position
-
-# Cleanup code, (format, remove useless stuff)
-
-# Draw a slice through 3d image, so we know where we are
-
-# Add other graphs (A way to view and compare mask, training slices?)
-# Other graph shows score?
-
-# Can add another row for the predicted label
-# Show score
-# Graph score per slice?
-
-# check code behind volume slicer
-
+# Change this to more stable version without sliders
+# Can reload the whole image every time.
 
 # Check .nii file
 # Should i just load 3d matrix the go over it with slider?
