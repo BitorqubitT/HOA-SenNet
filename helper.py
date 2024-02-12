@@ -1,0 +1,110 @@
+# Function to resize image to 1024x1024 without rotation
+def to_1024_no_rot(img, image_size=1024):
+    if image_size > img.shape[0]:
+        # Calculate padding for top and bottom
+        start1 = (image_size - img.shape[0]) // 2
+        top = img[0: start1, 0: img.shape[1]]
+        bottom = img[img.shape[0] - start1: img.shape[0], 0: img.shape[1]]
+        
+        # Concatenate top, image, and bottom
+        img_result = np.concatenate((top, img, bottom), axis=0)
+    else:
+        img_result = img
+    
+    return img_result
+
+# Function to resize image to 1024x1024 using to_1024 function
+def to_1024_1024(img, image_size=1024):
+    img_result = to_1024(img, image_size)
+    return img_result
+
+# Function to resize image back to original size
+def to_original(im_after, img, image_size=1024):
+    top_ = 0
+    left_ = 0
+    
+    # Calculate padding for top
+    if im_after.shape[0] > img.shape[0]:
+        top_ = (image_size - img.shape[0]) // 2
+    
+    # Calculate padding for left
+    if im_after.shape[1] > img.shape[1]:
+        left_ = (image_size - img.shape[1]) // 2
+    
+    # Extract the region of interest from the resized image
+    if (top_ > 0) or (left_ > 0):
+        img_result = im_after[top_: img.shape[0] + top_, left_: img.shape[1] + left_]
+    else:
+        img_result = im_after
+    
+    return img_result
+
+# Function to encode a binary mask using Run-Length Encoding (RLE)
+def rle_encode(mask):
+    pixel = mask.flatten()
+    pixel = np.concatenate([[0], pixel, [0]])
+    run = np.where(pixel[1:] != pixel[:-1])[0] + 1
+    run[1::2] -= run[::2]
+    rle = ' '.join(str(r) for r in run)
+    if rle == '':
+        rle = '1 0'
+    return rle
+
+# Function for min-max normalization of a PyTorch tensor
+def min_max_normalization(x: tc.Tensor) -> tc.Tensor:
+    """input.shape=(batch,f1,...)"""
+    shape = x.shape
+    if x.ndim > 2:
+        x = x.reshape(x.shape[0], -1)
+
+    min_ = x.min(dim=-1, keepdim=True)[0]
+    max_ = x.max(dim=-1, keepdim=True)[0]
+    if min_.mean() == 0 and max_.mean() == 1:
+        return x.reshape(shape)
+
+    x = (x - min_) / (max_ - min_ + 1e-9)
+    return x.reshape(shape)
+
+# Function for normalization with clipping of a PyTorch tensor
+def norm_with_clip(x: tc.Tensor, smooth=1e-5):
+    dim = list(range(1, x.ndim))
+    mean = x.mean(dim=dim, keepdim=True)
+    std = x.std(dim=dim, keepdim=True)
+    x = (x - mean) / (std + smooth)
+    x[x > 5] = (x[x > 5] - 5) * 1e-3 + 5
+    x[x < -3] = (x[x < -3] + 3) * 1e-3 - 3
+    return x
+
+# Function to add an edge to an image tensor
+def add_edge(x: tc.Tensor, edge: int):
+    # x=(C,H,W)
+    # output=(C,H+2*edge,W+2*edge)
+    mean_ = int(x.to(tc.float32).mean())
+    x = tc.cat([x, tc.ones([x.shape[0], edge, x.shape[2]], dtype=x.dtype, device=x.device) * mean_], dim=1)
+    x = tc.cat([x, tc.ones([x.shape[0], x.shape[1], edge], dtype=x.dtype, device=x.device) * mean_], dim=2)
+    x = tc.cat([tc.ones([x.shape[0], edge, x.shape[2]], dtype=x.dtype, device=x.device) * mean_, x], dim=1)
+    x = tc.cat([tc.ones([x.shape[0], x.shape[1], edge], dtype=x.dtype, device=x.device) * mean_, x], dim=2)
+    return x
+
+# Function to resize image to 1024x1024 with rotation
+def to_1024(img, image_size=1024):
+    if image_size > img.shape[1]:
+        # Rotate image 90 degrees
+        img = np.rot90(img)
+        
+        # Calculate padding for top and bottom
+        start1 = (CFG.image_size - img.shape[0]) // 2
+        top = img[0: start1, 0: img.shape[1]]
+        bottom = img[img.shape[0] - start1: img.shape[0], 0: img.shape[1]]
+        
+        # Concatenate top, rotated image, and bottom
+        img_result = np.concatenate((top, img, bottom), axis=0)
+        
+        # Rotate image back to the original orientation
+        img_result = np.rot90(img_result)
+        img_result = np.rot90(img_result)
+        img_result = np.rot90(img_result)
+    else:
+        img_result = img
+    
+    return img_result

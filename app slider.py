@@ -1,7 +1,5 @@
 from time import time
 
-import rasterio
-from rasterio.plot import show
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -17,13 +15,24 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash import html
 from dash import dcc
-from dash_slicer import VolumeSlicer
 import tifffile
 import torch
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
 server = app.server
+
+#set param for image size
+WIDTH = 500
+HEIGHT = 500
+
 # TODO:
+
+#check if i can convert the type to something which uses less memory.
+#https://github.com/plotly/dash-slicer/blob/main/dash_slicer/slicer.py
+# read performance tips (chat?).
+# How much do I want to load in memory
+
+# If I dont get it to work "well", put it in the todo list.
 
 #work with slider and try to up the performance
 # dcc? store?
@@ -45,6 +54,10 @@ server = app.server
 # Graph score per slice?
 
 # ------------- Define App Layout ---------------------------------------------------
+
+dev_tools_props_check=False
+update_title=None
+
 mesh_card = dbc.Card(
     [ dcc.Loading(
         children = [
@@ -94,7 +107,7 @@ def pre_load_image():
     for file in sorted(os.listdir(labels_folder_path))[800:950]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
-            label_image = label_image[0::2, 0::2]
+            label_image = label_image[0::1, 0::1]
             label_images.append(label_image)
     # Combine the first 100 images into one 3D tensor
     x = np.array(label_images)
@@ -106,10 +119,11 @@ def pre_load_label():
     for file in sorted(os.listdir(labels_folder_path))[800:950]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
-            label_image = label_image[0::2, 0::2]
+            label_image = label_image[0::1, 0::1]
             label_images.append(label_image)
     # Combine the first 100 images into one 3D tensor
     x = np.array(label_images)
+    print(" imagesize", x.shape)
     return x
 
 x = pre_load_image()
@@ -232,7 +246,7 @@ def create_histo(step_size, threshold, slice_slider):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = x[slice_number]
-    fig = px.imshow(img)
+    fig = px.imshow(img, width=500, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
@@ -245,7 +259,7 @@ def create_liver_msk2(slice_number):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = x[slice_number]
-    fig = px.imshow(img)
+    fig = px.imshow(img, width=500, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
@@ -258,7 +272,7 @@ def create_liver_msk2(slice_number):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = xz[slice_number]
-    fig = px.imshow(img)
+    fig = px.imshow(img, width=500, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)

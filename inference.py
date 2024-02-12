@@ -44,20 +44,10 @@ class CFG:
 
     # Model paths for different folds
     model_path = [
-        "/kaggle/input/2-5d-cutting-model-baseline-training/se_resnext50_32x4d_19_loss0.12_score0.79_val_loss0.25_val_score0.79.pt",
-        "/kaggle/input/training-6-512/se_resnext50_32x4d_19_loss0.09_score0.83_val_loss0.28_val_score0.83.pt",
-        "/kaggle/input/training-6-512/se_resnext50_32x4d_19_loss0.05_score0.90_val_loss0.25_val_score0.86.pt",
-        "/kaggle/input/training-6-512/se_resnext50_32x4d_19_loss0.05_score0.89_val_loss0.24_val_score0.86_midd.pt",
-        "/kaggle/input/training-6-512/se_resnext50_32x4d_24_loss0.05_score0.90_val_loss0.23_val_score0.88_midd.pt",
-        "/kaggle/input/training-6-512/se_resnext50_32x4d_24_loss0.04_score0.91_val_loss0.23_val_score0.88_midd.pt",  # 25 025 rot 512 center
-        "/kaggle/input/blood-vessel-model-1024/se_resnext50_32x4d_24_loss0.10_score0.90_val_loss0.16_val_score0.85_midd_1024.pt",
-        "/kaggle/input/blood-vessel-model-1024/se_resnext50_32x4d_24_loss0.10_score0.90_val_loss0.12_val_score0.88_midd_1024.pt",  # lr = 8e-5
-        "/kaggle/input/blood-vessel-model-1024/se_resnext50_32x4d_24_loss0.91_score0.09_val_loss0.91_val_score0.09_midd_1024.pt",  # 60e-5 
         "/kaggle/input/sn-hoa-8e-5-27-rot0-5/se_resnext50_32x4d_26_loss0.10_score0.90_val_loss0.12_val_score0.88_midd_1024.pt",  # 8e-5-27-rot0-5
         "/kaggle/input/sn-hoa-8e-5-27-rot0-5/se_resnext50_32x4d_30_loss0.10_score0.90_val_loss0.13_val_score0.88_midd_1024.pt",
         "/kaggle/input/sennet-kidney-1-and-3/model_real_23.pt"  # 31 8e 05
     ]
-
 
 # Custom model class definition
 class CustomModel(nn.Module):
@@ -135,119 +125,6 @@ def build_model(weight=None):
 
     # Moving the model to the GPU
     return model.cuda()
-
-
-# Function to resize image to 1024x1024 with rotation
-def to_1024(img, image_size=1024):
-    if image_size > img.shape[1]:
-        # Rotate image 90 degrees
-        img = np.rot90(img)
-        
-        # Calculate padding for top and bottom
-        start1 = (CFG.image_size - img.shape[0]) // 2
-        top = img[0: start1, 0: img.shape[1]]
-        bottom = img[img.shape[0] - start1: img.shape[0], 0: img.shape[1]]
-        
-        # Concatenate top, rotated image, and bottom
-        img_result = np.concatenate((top, img, bottom), axis=0)
-        
-        # Rotate image back to the original orientation
-        img_result = np.rot90(img_result)
-        img_result = np.rot90(img_result)
-        img_result = np.rot90(img_result)
-    else:
-        img_result = img
-    
-    return img_result
-
-# Function to resize image to 1024x1024 without rotation
-def to_1024_no_rot(img, image_size=1024):
-    if image_size > img.shape[0]:
-        # Calculate padding for top and bottom
-        start1 = (image_size - img.shape[0]) // 2
-        top = img[0: start1, 0: img.shape[1]]
-        bottom = img[img.shape[0] - start1: img.shape[0], 0: img.shape[1]]
-        
-        # Concatenate top, image, and bottom
-        img_result = np.concatenate((top, img, bottom), axis=0)
-    else:
-        img_result = img
-    
-    return img_result
-
-# Function to resize image to 1024x1024 using to_1024 function
-def to_1024_1024(img, image_size=1024):
-    img_result = to_1024(img, image_size)
-    return img_result
-
-# Function to resize image back to original size
-def to_original(im_after, img, image_size=1024):
-    top_ = 0
-    left_ = 0
-    
-    # Calculate padding for top
-    if im_after.shape[0] > img.shape[0]:
-        top_ = (image_size - img.shape[0]) // 2
-    
-    # Calculate padding for left
-    if im_after.shape[1] > img.shape[1]:
-        left_ = (image_size - img.shape[1]) // 2
-    
-    # Extract the region of interest from the resized image
-    if (top_ > 0) or (left_ > 0):
-        img_result = im_after[top_: img.shape[0] + top_, left_: img.shape[1] + left_]
-    else:
-        img_result = im_after
-    
-    return img_result
-
-# Function to encode a binary mask using Run-Length Encoding (RLE)
-def rle_encode(mask):
-    pixel = mask.flatten()
-    pixel = np.concatenate([[0], pixel, [0]])
-    run = np.where(pixel[1:] != pixel[:-1])[0] + 1
-    run[1::2] -= run[::2]
-    rle = ' '.join(str(r) for r in run)
-    if rle == '':
-        rle = '1 0'
-    return rle
-
-# Function for min-max normalization of a PyTorch tensor
-def min_max_normalization(x: tc.Tensor) -> tc.Tensor:
-    """input.shape=(batch,f1,...)"""
-    shape = x.shape
-    if x.ndim > 2:
-        x = x.reshape(x.shape[0], -1)
-
-    min_ = x.min(dim=-1, keepdim=True)[0]
-    max_ = x.max(dim=-1, keepdim=True)[0]
-    if min_.mean() == 0 and max_.mean() == 1:
-        return x.reshape(shape)
-
-    x = (x - min_) / (max_ - min_ + 1e-9)
-    return x.reshape(shape)
-
-# Function for normalization with clipping of a PyTorch tensor
-def norm_with_clip(x: tc.Tensor, smooth=1e-5):
-    dim = list(range(1, x.ndim))
-    mean = x.mean(dim=dim, keepdim=True)
-    std = x.std(dim=dim, keepdim=True)
-    x = (x - mean) / (std + smooth)
-    x[x > 5] = (x[x > 5] - 5) * 1e-3 + 5
-    x[x < -3] = (x[x < -3] + 3) * 1e-3 - 3
-    return x
-
-# Function to add an edge to an image tensor
-def add_edge(x: tc.Tensor, edge: int):
-    # x=(C,H,W)
-    # output=(C,H+2*edge,W+2*edge)
-    mean_ = int(x.to(tc.float32).mean())
-    x = tc.cat([x, tc.ones([x.shape[0], edge, x.shape[2]], dtype=x.dtype, device=x.device) * mean_], dim=1)
-    x = tc.cat([x, tc.ones([x.shape[0], x.shape[1], edge], dtype=x.dtype, device=x.device) * mean_], dim=2)
-    x = tc.cat([tc.ones([x.shape[0], edge, x.shape[2]], dtype=x.dtype, device=x.device) * mean_, x], dim=1)
-    x = tc.cat([tc.ones([x.shape[0], x.shape[1], edge], dtype=x.dtype, device=x.device) * mean_, x], dim=2)
-    return x
-
 
 # Dataset class for loading images
 class Data_loader(Dataset):
@@ -445,7 +322,6 @@ def get_output(debug=False):
         outputs[1].extend(mark)
     
     return outputs
-
 
 # Check if it's for submission based on the presence of test images
 is_submit = len(glob("/kaggle/input/blood-vessel-segmentation/test/kidney_5/images/*.tif")) != 3
