@@ -17,7 +17,7 @@ from dash import html
 from dash import dcc
 import tifffile
 import torch
-external_stylesheets = [dbc.themes.BOOTSTRAP]
+external_stylesheets = [dbc.themes.BOOTSTRAP, '/assets/style.css']
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
 server = app.server
 
@@ -27,31 +27,20 @@ HEIGHT = 500
 
 # TODO:
 
+# Check focalboard
+
 #check if i can convert the type to something which uses less memory.
 #https://github.com/plotly/dash-slicer/blob/main/dash_slicer/slicer.py
 # read performance tips (chat?).
 # How much do I want to load in memory
 
-# If I dont get it to work "well", put it in the todo list.
-
-#work with slider and try to up the performance
 # dcc? store?
-# check code behind volume slicer
 
-# set good param
-# Fix size of everything
-# Fix position
-
-# Cleanup code, (format, remove useless stuff)
-
-# Draw a slice through 3d image, so we know where we are
+# Set good params
 
 # Add other graphs (A way to view and compare mask, training slices?)
-# Other graph shows score?
 
-# Can add another row for the predicted label
 # Show score
-# Graph score per slice?
 
 # ------------- Define App Layout ---------------------------------------------------
 
@@ -147,10 +136,11 @@ button_threshold = dcc.Dropdown(
     value=200,
 )
 
-slider_liver = dcc.Slider(
-    1, 300, 1,
+slider_kidney = dcc.Slider(
+    1, 300, 10,
     id = "slice_slider",
-    value=200,
+    value = 200,
+    marks = None,
     )
 
 # create two buttons for liver pic
@@ -168,7 +158,8 @@ app.layout = html.Div(
                          dbc.Col([dbc.Col(button_threshold),])
                          ]),
                 dbc.Row([dbc.Col(mesh_card),]),
-                dbc.Row([dbc.Col(slider_liver), 
+                dbc.Row([dbc.Col(html.P(["Choose slice height:"])),
+                         dbc.Col(slider_kidney, id="slider_kidney"), 
                         ]),                     
                 dbc.Row([dbc.Col(slice_card),
                          dbc.Col(mask_card),
@@ -221,6 +212,7 @@ def create_histo(step_size, threshold, slice_slider):
     volume_shape = all_images.shape
 
     # Define the height of the horizontal plane
+    print(volume_shape[0])
     plane_height = volume_shape[0] // 2  # You can adjust this as needed
     print("slider value is:", slice_slider)
     print("height is:", plane_height)

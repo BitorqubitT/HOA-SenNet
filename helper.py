@@ -1,3 +1,5 @@
+import torch as tc
+
 # Function to resize image to 1024x1024 without rotation
 def to_1024_no_rot(img, image_size=1024):
     if image_size > img.shape[0]:
@@ -108,3 +110,20 @@ def to_1024(img, image_size=1024):
         img_result = img
     
     return img_result
+
+def add_noise(x:tc.Tensor,max_randn_rate=0.1,randn_rate=None,x_already_normed=False):
+    """input.shape=(batch,f1,f2,...) output's var will be normalizate  """
+    ndim=x.ndim-1
+    if x_already_normed:
+        x_std=tc.ones([x.shape[0]]+[1]*ndim,device=x.device,dtype=x.dtype)
+        x_mean=tc.zeros([x.shape[0]]+[1]*ndim,device=x.device,dtype=x.dtype)
+    else: 
+        dim=list(range(1,x.ndim))
+        x_std=x.std(dim=dim,keepdim=True)
+        x_mean=x.mean(dim=dim,keepdim=True)
+    if randn_rate is None:
+        randn_rate=max_randn_rate*np.random.rand()*tc.rand(x_mean.shape,device=x.device,dtype=x.dtype)
+    cache=(x_std**2+(x_std*randn_rate)**2)**0.5
+    return (x-x_mean+tc.randn(size=x.shape,device=x.device,dtype=x.dtype)*randn_rate*x_std)/(cache+1e-7)
+ 
+
