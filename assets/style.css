@@ -1,7 +1,21 @@
-/* styles.css */
+/* Styles for the two dropdown menus on top */
+.Paramdrop {
+    width: 50%;
+}
 
-slider_kidney {
-    width: 1000%; /* Adjust the width as needed */
+/* Styles for the slicer controlling 4 graphs */
+.Sliderboy {
+    width: 80%;
+    margin-top: 9px;
+    margin-left: -23px;
+}
+
+.row-spacing {
+    margin-bottom: 60px; /* Adjust the margin as needed */
+}
+
+.score-holder {
+    width: 50%;
 }
 
 body {

@@ -1,4 +1,9 @@
 import torch as tc
+from typing import Optional
+import torch.nn as nn
+import torch.nn.functional as F
+
+from .one_hot import one_hot
 
 # Function to resize image to 1024x1024 without rotation
 def to_1024_no_rot(img, image_size=1024):
@@ -52,7 +57,7 @@ def rle_encode(mask):
         rle = '1 0'
     return rle
 
-# Function for min-max normalization of a PyTorch tensor
+# Function for min-max normalization of a Pytc tensor
 def min_max_normalization(x: tc.Tensor) -> tc.Tensor:
     """input.shape=(batch,f1,...)"""
     shape = x.shape
@@ -67,7 +72,7 @@ def min_max_normalization(x: tc.Tensor) -> tc.Tensor:
     x = (x - min_) / (max_ - min_ + 1e-9)
     return x.reshape(shape)
 
-# Function for normalization with clipping of a PyTorch tensor
+# Function for normalization with clipping of a Pytc tensor
 def norm_with_clip(x: tc.Tensor, smooth=1e-5):
     dim = list(range(1, x.ndim))
     mean = x.mean(dim=dim, keepdim=True)
@@ -127,3 +132,85 @@ def add_noise(x:tc.Tensor,max_randn_rate=0.1,randn_rate=None,x_already_normed=Fa
     return (x-x_mean+tc.randn(size=x.shape,device=x.device,dtype=x.dtype)*randn_rate*x_std)/(cache+1e-7)
  
 
+# based on:
+# https://github.com/kevinzakka/pytc-goodies/blob/master/losses.py
+
+class DiceLoss(nn.Module):
+    r"""Criterion that computes Sørensen-Dice Coefficient loss.
+
+    According to [1], we compute the Sørensen-Dice Coefficient as follows:
+
+    .. math::
+
+        \text{Dice}(x, class) = \frac{2 |X| \cap |Y|}{|X| + |Y|}
+
+    where:
+       - :math:`X` expects to be the scores of each class.
+       - :math:`Y` expects to be the one-hot tensor with the class labels.
+
+    the loss, is finally computed as:
+
+    .. math::
+
+        \text{loss}(x, class) = 1 - \text{Dice}(x, class)
+
+    [1] https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
+
+    Shape:
+        - Input: :math:`(N, C, H, W)` where C = number of classes.
+        - Target: :math:`(N, H, W)` where each value is
+          :math:`0 ≤ targets[i] ≤ C−1`.
+
+    Examples:
+        >>> N = 5  # num_classes
+        >>> loss = tgm.losses.DiceLoss()
+        >>> input = tc.randn(1, N, 3, 5, requires_grad=True)
+        >>> target = tc.empty(1, 3, 5, dtype=tc.long).random_(N)
+        >>> output = loss(input, target)
+        >>> output.backward()
+    """
+
+    def __init__(self) -> None:
+        super(DiceLoss, self).__init__()
+        self.eps: float = 1e-6
+
+    def forward(
+            self,
+            input: tc.Tensor,
+            target: tc.Tensor) -> tc.Tensor:
+        if not tc.is_tensor(input):
+            raise TypeError("Input type is not a tc.Tensor. Got {}"
+                            .format(type(input)))
+        if not len(input.shape) == 4:
+            raise ValueError("Invalid input shape, we expect BxNxHxW. Got: {}"
+                             .format(input.shape))
+        if not input.shape[-2:] == target.shape[-2:]:
+            raise ValueError("input and target shapes must be the same. Got: {}"
+                             .format(input.shape, input.shape))
+        if not input.device == target.device:
+            raise ValueError(
+                "input and target must be in the same device. Got: {}" .format(
+                    input.device, target.device))
+        # compute softmax over the classes axis
+        input_soft = F.softmax(input, dim=1)
+
+        # create the labels one hot tensor
+        target_one_hot = one_hot(target, num_classes=input.shape[1],
+                                 device=input.device, dtype=input.dtype)
+
+        # compute the actual dice score
+        dims = (1, 2, 3)
+        intersection = tc.sum(input_soft * target_one_hot, dims)
+        cardinality = tc.sum(input_soft + target_one_hot, dims)
+
+        dice_score = 2. * intersection / (cardinality + self.eps)
+        return tc.mean(1. - dice_score)
+
+def dice_loss(
+        input: tc.Tensor,
+        target: tc.Tensor) -> tc.Tensor:
+    r"""Function that computes Sørensen-Dice Coefficient loss.
+
+    See :class:`~tcgeometry.losses.DiceLoss` for details.
+    """
+    return DiceLoss()(input, target)

@@ -17,6 +17,9 @@ from dash import html
 from dash import dcc
 import tifffile
 import torch
+
+#import helper
+
 external_stylesheets = [dbc.themes.BOOTSTRAP, '/assets/style.css']
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
 server = app.server
@@ -88,6 +91,16 @@ mask_truth_card = dbc.Card(
     ]
 )
 
+score_card = dbc.Card(
+    [ dcc.Loading(
+        id="loading-score",
+        type="default",
+        children=html.Div(id="loading-output-1")
+        )
+    ],
+    className="score-holder"
+)
+
 # check effect of resizing
 # Check if I can implement this similar to the rest
 def pre_load_image():
@@ -115,6 +128,13 @@ def pre_load_label():
     print(" imagesize", x.shape)
     return x
 
+# Get this from the other matrices?
+"""
+def get_diceloss(slice):
+    return helper.dice_loss(xx[slice], yy[slice])
+"""
+
+
 x = pre_load_image()
 xz = pre_load_label()
 
@@ -126,6 +146,7 @@ button_stepsize = dcc.Dropdown(
                for i in range(1, 10)
               ],
     value=3,
+    className="Paramdrop"
 )
 
 button_threshold = dcc.Dropdown(
@@ -134,6 +155,7 @@ button_threshold = dcc.Dropdown(
                for i in range(100, 300, 100)
               ],
     value=200,
+    className="Paramdrop"
 )
 
 slider_kidney = dcc.Slider(
@@ -141,30 +163,49 @@ slider_kidney = dcc.Slider(
     id = "slice_slider",
     value = 200,
     marks = None,
+    className="Sliderboy"
     )
 
 # create two buttons for liver pic
 
 # We can put a body in here, the define the body above which holds: buttons and graph
 # might want to use storesssssssssssssss
+# https://dash.plotly.com/dash-core-components/loading
+
 
 app.layout = html.Div(
     [
         dbc.Container(
             [
-                dbc.Row([dbc.Col(html.P(["Choose a step_size:"])),
-                         dbc.Col([dbc.Col(button_stepsize),]),
-                         dbc.Col(html.P(["Choose a threshold"])),
-                         dbc.Col([dbc.Col(button_threshold),])
-                         ]),
-                dbc.Row([dbc.Col(mesh_card),]),
-                dbc.Row([dbc.Col(html.P(["Choose slice height:"])),
-                         dbc.Col(slider_kidney, id="slider_kidney"), 
-                        ]),                     
-                dbc.Row([dbc.Col(slice_card),
-                         dbc.Col(mask_card),
-                         dbc.Col(mask_truth_card)
-                        ]),
+            dbc.Row([html.H2("Blood vessel segmentation")]),
+
+            dbc.Row([
+                dbc.Col(mesh_card, width=6),
+                dbc.Col([
+                    dbc.Row([
+                        dbc.Col(html.P(["Choose a step_size:"]), width=3),
+                        dbc.Col(button_stepsize, width=4)
+                    ]),
+                    dbc.Row([
+                        dbc.Col(html.P(["Choose a threshold:"]), width=3),
+                        dbc.Col(button_threshold, width=4)
+                    ]),
+                    dbc.Row([
+                        dbc.Col(html.P(["Choose a slice height:"]), width=3),
+                        dbc.Col(slider_kidney, width=4)
+                    ]),
+                    dbc.Row([
+                        dbc.Col(html.P(["Score:"]), width=3),
+                        dbc.Col(score_card, width=4)
+                        #dbc.Col(html.Span(id='output-score', children=''), width=4)
+                    ])
+                ])
+            ], className="row-spacing"),
+
+            dbc.Row([dbc.Col(slice_card, width = 3),
+                     dbc.Col(mask_card, width = 3),
+                     dbc.Col(mask_truth_card, width = 3)
+                    ]),
             ],
             fluid=True,
         ),
@@ -179,6 +220,10 @@ app.layout = html.Div(
 def create_histo(step_size, threshold, slice_slider):
     # Is there  a way to compute this on gpu?
     # Can also put this in top function and call the function every time a param is udpated
+    # What happens when i put this in memory so we dont have to compute everytime?
+    # We actually only have to recopmute when we touch step_size etc.
+    # Is this what we are doing now or not?
+
     labels_folder_path = 'D:/data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
     label_images = []
     for file in sorted(os.listdir(labels_folder_path))[100:900]:
@@ -204,7 +249,7 @@ def create_histo(step_size, threshold, slice_slider):
     verts, faces, _, _ = measure.marching_cubes(med_img, threshold, step_size=step_size)
     x, y, z = verts.T
     i, j, k = faces.T
-    fig = go.Figure()
+    fig = go.Figure(layout={})
     fig.add_trace(go.Mesh3d(x=z, y=y, z=x, opacity=0.2, i=k, j=j, k=i))
 
     # add plane
@@ -220,8 +265,7 @@ def create_histo(step_size, threshold, slice_slider):
     x_plane, y_plane = np.meshgrid(np.arange(volume_shape[2]), np.arange(volume_shape[1]))
     z_plane = np.full_like(x_plane, plane_height)
 
-    fig.add_trace(go.Surface(z=z_plane, y=y_plane, x=x_plane, opacity=0.5))
-
+    fig.add_trace(go.Surface(z=z_plane, y=y_plane, x=x_plane, opacity=0.5, showscale=False))
     return fig
 
 # Can clean up this code by having 2 outputs in the same callback
@@ -238,7 +282,7 @@ def create_histo(step_size, threshold, slice_slider):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = x[slice_number]
-    fig = px.imshow(img, width=500, height=750)
+    fig = px.imshow(img, width=450, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
@@ -251,7 +295,7 @@ def create_liver_msk2(slice_number):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = x[slice_number]
-    fig = px.imshow(img, width=500, height=750)
+    fig = px.imshow(img, width=450, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
@@ -264,11 +308,18 @@ def create_liver_msk2(slice_number):
 def create_liver_msk2(slice_number):
     # Find better way to preload
     img = xz[slice_number]
-    fig = px.imshow(img, width=500, height=750)
+    fig = px.imshow(img, width=450, height=750)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
     return fig
+
+@app.callback(
+    Output("loading-score", "children"),
+    [Input("slice_slider", "value")]
+)
+def score_calc(value):
+    return str(value)
 
 if __name__ == "__main__":
     app.run_server(debug=True, dev_tools_props_check=False)
