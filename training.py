@@ -14,14 +14,15 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.parallel import DataParallel
 from glob import glob
+import helper
+
+tc.cuda.is_available()
 
 p_augm = 0.05 #0.5
 #add rotate.  less p_augm
 
 # TODO:
-# Put all helper files and config in different file?
-# Check different params
-# Maybe split preprocessing
+# Check dotenv class -> alternatives?
 
 class CFG:
     # ============== pred target =============
@@ -29,6 +30,7 @@ class CFG:
 
     # ============== model CFG =============
     model_name = 'Unet'
+    # Differrent training models?
     backbone = 'se_resnext50_32x4d'
 
     # Change to 5 for 3d?
@@ -107,7 +109,7 @@ class Data_loader(Dataset):
          
         img = cv2.imread(self.paths[index],cv2.IMREAD_GRAYSCALE)
         
-        img = to_1024_1024(img , image_size = CFG.image_size ) #  to_original( im_after, img_save, image_size = 1024)
+        img = helper.to_1024_1024(img, CFG, image_size = CFG.image_size ) #  to_original( im_after, img_save, image_size = 1024)
 
         img = tc.from_numpy(img.copy())
         if self.is_label:
@@ -136,7 +138,7 @@ def load_data(paths,is_label=False):
         TH:int = np.partition(TH, -index)[-index]
         x[x<TH]=int(TH)
         ########################################################################
-        x=(min_max_normalization(x.to(tc.float16)[None])[0]*255).to(tc.uint8)
+        x=(helper.min_max_normalization(x.to(tc.float16)[None])[0]*255).to(tc.uint8)
     return x
 
 
@@ -219,103 +221,108 @@ class Kaggld_Dataset(Dataset):
                         y=y.flip(dims=(i-1,))
         return x,y#(uint8,uint8)
 
-train_x=[]
-train_y=[]
+if __name__ == "__main__":
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
 
-root_path="/kaggle/input/blood-vessel-segmentation/"
-parhs=["/kaggle/input/blood-vessel-segmentation/train/kidney_1_dense"]
-for i,path in enumerate(parhs):
-    if path=="/kaggle/input/blood-vessel-segmentation/train/kidney_3_dense":
-        continue
-    x=load_data(glob(f"{path}/images/*"),is_label=False)
-    print(x.shape)
-    y=load_data(glob(f"{path}/labels/*"),is_label=True)
-    print(y.shape)
-    train_x.append(x)
-    train_y.append(y)
-    #(C,H,W)
-    #aug
-    train_x.append(x.permute(1,2,0))
-    train_y.append(y.permute(1,2,0))
-    train_x.append(x.permute(2,0,1))
-    train_y.append(y.permute(2,0,1))
-path1="/kaggle/input/blood-vessel-segmentation/train/kidney_3_sparse"
-path2="/kaggle/input/blood-vessel-segmentation/train/kidney_3_dense"
-paths_y=glob(f"{path2}/labels/*")
-paths_x=[x.replace("labels","images").replace("dense","sparse") for x in paths_y]
+    train_x=[]
+    train_y=[]
 
-val_x=load_data(paths_x,is_label=False)
-print(val_x.shape)
-val_y=load_data(paths_y,is_label=True)
-print(val_y.shape)
+    root_path="D:/data/"
+    parhs=["D:/data/train/kidney_1_dense"]
+    for i,path in enumerate(parhs):
+        if path=="D:/data/train/kidney_3_dense":
+            continue
+        x=load_data(glob(f"{path}/images/*"),is_label=False)
+        print(x.shape)
+        y=load_data(glob(f"{path}/labels/*"),is_label=True)
+        print(y.shape)
+        train_x.append(x)
+        train_y.append(y)
+        #(C,H,W)
+        #aug
+        train_x.append(x.permute(1,2,0))
+        train_y.append(y.permute(1,2,0))
+        train_x.append(x.permute(2,0,1))
+        train_y.append(y.permute(2,0,1))
+    path1="D:/data/train/kidney_3_sparse"
+    path2="D:/data/train/kidney_3_dense"
+    paths_y=glob(f"{path2}/labels/*")
+    paths_x=[x.replace("labels","images").replace("dense","sparse") for x in paths_y]
 
-tc.backends.cudnn.enabled = True
-tc.backends.cudnn.benchmark = True
-    
-train_dataset = Kaggld_Dataset(train_x,train_y,arg=True)
-train_dataset = DataLoader(train_dataset, batch_size=CFG.train_batch_size ,num_workers=2, shuffle=True, pin_memory=True)
-val_dataset = Kaggld_Dataset([val_x],[val_y])
-val_dataset = DataLoader(val_dataset, batch_size=CFG.valid_batch_size, num_workers=2, shuffle=False, pin_memory=True)
+    val_x=load_data(paths_x,is_label=False)
+    print(val_x.shape)
+    val_y=load_data(paths_y,is_label=True)
+    print(val_y.shape)
 
-model = build_model()
-model = DataParallel(model)
-
-loss_fc = DiceLoss()
-#loss_fn=nn.BCEWithLogitsLoss()
-optimizer = tc.optim.AdamW(model.parameters(),lr=CFG.lr)
-scaler = tc.cuda.amp.GradScaler()
-scheduler = tc.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=CFG.lr,
-                                                steps_per_epoch=len(train_dataset), epochs=CFG.epochs+1,
-                                                pct_start=0.1,)
-for epoch in range(CFG.epochs):
-    model.train()
-    time=tqdm(range(len(train_dataset)))
-    losss=0
-    scores=0
-    for i,(x,y) in enumerate(train_dataset):
-        x=x.cuda().to(tc.float32)
-        y=y.cuda().to(tc.float32)
-        x=norm_with_clip(x.reshape(-1,*x.shape[2:])).reshape(x.shape)
-        x=add_noise(x,max_randn_rate=0.5,x_already_normed=True)
+    tc.backends.cudnn.enabled = True
+    tc.backends.cudnn.benchmark = True
         
-        with autocast():
-            pred=model(x)
-            loss=loss_fc(pred,y)
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-        optimizer.zero_grad()
-        scheduler.step()
-        score=dice(pred.detach(),y)
-        losss=(losss*i+loss.item())/(i+1)
-        scores=(scores*i+score)/(i+1)
-        time.set_description(f"epoch:{epoch},loss:{losss:.4f},score:{scores:.4f},lr{optimizer.param_groups[0]['lr']:.4e}")
-        time.update()
-        del loss, pred
-    time.close()
-    
-    model.eval()
-    time=tqdm(range(len(val_dataset)))
-    val_losss=0
-    val_scores=0
-    for i,(x,y) in enumerate(val_dataset):
-        x=x.cuda().to(tc.float32)
-        y=y.cuda().to(tc.float32)
-        x=norm_with_clip(x.reshape(-1,*x.shape[2:])).reshape(x.shape)
+    train_dataset = Kaggld_Dataset(train_x,train_y,arg=True)
+    train_dataset = DataLoader(train_dataset, batch_size=CFG.train_batch_size ,num_workers=2, shuffle=True, pin_memory=True)
+    val_dataset = Kaggld_Dataset([val_x],[val_y])
+    val_dataset = DataLoader(val_dataset, batch_size=CFG.valid_batch_size, num_workers=2, shuffle=False, pin_memory=True)
 
-        with autocast():
-            with tc.no_grad():
+    model = build_model()
+    model = DataParallel(model)
+
+    loss_fc = DiceLoss()
+    #loss_fn=nn.BCEWithLogitsLoss()
+    optimizer = tc.optim.AdamW(model.parameters(),lr=CFG.lr)
+    scaler = tc.cuda.amp.GradScaler()
+    scheduler = tc.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=CFG.lr,
+                                                    steps_per_epoch=len(train_dataset), epochs=CFG.epochs+1,
+                                                    pct_start=0.1,)
+    for epoch in range(CFG.epochs):
+        model.train()
+        time=tqdm(range(len(train_dataset)))
+        losss=0
+        scores=0
+        for i,(x,y) in enumerate(train_dataset):
+            x=x.cuda().to(tc.float32)
+            y=y.cuda().to(tc.float32)
+            x=helper.norm_with_clip(x.reshape(-1,*x.shape[2:])).reshape(x.shape)
+            x=helper.add_noise(x,max_randn_rate=0.5,x_already_normed=True)
+            
+            with autocast():
                 pred=model(x)
                 loss=loss_fc(pred,y)
-        score = dice_coef(pred.detach(),y)
-        val_losss = (val_losss*i+loss.item())/(i+1)
-        val_scores = (val_scores*i+score)/(i+1)
-        time.set_description(f"val-->loss:{val_losss:.4f},score:{val_scores:.4f}")
-        time.update()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+            scheduler.step()
+            # sub in different score function
+            score=dice_coef(pred.detach(),y)
+            losss=(losss*i+loss.item())/(i+1)
+            scores=(scores*i+score)/(i+1)
+            time.set_description(f"epoch:{epoch},loss:{losss:.4f},score:{scores:.4f},lr{optimizer.param_groups[0]['lr']:.4e}")
+            time.update()
+            del loss, pred
+        time.close()
+        
+        model.eval()
+        time=tqdm(range(len(val_dataset)))
+        val_losss=0
+        val_scores=0
+        for i,(x,y) in enumerate(val_dataset):
+            x=x.cuda().to(tc.float32)
+            y=y.cuda().to(tc.float32)
+            x=helper.norm_with_clip(x.reshape(-1,*x.shape[2:])).reshape(x.shape)
+
+            with autocast():
+                with tc.no_grad():
+                    pred=model(x)
+                    loss=loss_fc(pred,y)
+            score = dice_coef(pred.detach(),y)
+            val_losss = (val_losss*i+loss.item())/(i+1)
+            val_scores = (val_scores*i+score)/(i+1)
+            time.set_description(f"val-->loss:{val_losss:.4f},score:{val_scores:.4f}")
+            time.update()
+
+        time.close()
+    tc.save(model.module.state_dict(),f"./{CFG.backbone}_{epoch}_loss{losss:.2f}_score{scores:.2f}_val_loss{val_losss:.2f}_val_score{val_scores:.2f}_midd_1024_final.pt")
 
     time.close()
-tc.save(model.module.state_dict(),f"./{CFG.backbone}_{epoch}_loss{losss:.2f}_score{scores:.2f}_val_loss{val_losss:.2f}_val_score{val_scores:.2f}_midd_1024_final.pt")
-
-time.close()
 
 
