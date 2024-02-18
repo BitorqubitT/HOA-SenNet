@@ -7,13 +7,10 @@ import numpy as np
 from tqdm import tqdm
 
 import cv2
-import os
-import sys
 from glob import glob
 import matplotlib.pyplot as plt
 import pandas as pd
 
-#!python -m pip install --no-index --find-links=/kaggle/input/pip-download-for-segmentation-models-pytorch segmentation-models-pytorch -q
 import segmentation_models_pytorch as smp
 from dotenv import load_dotenv
 import helper
@@ -24,7 +21,6 @@ model_path_i9 = 0
 
 # Configuration class containing various model and training parameters
 class CFG:
-    # Model configuration
     model_name = 'Unet'
     backbone = 'se_resnext50_32x4d'
     in_chans = 1
@@ -36,7 +32,6 @@ class CFG:
     target_size = 1
     chopping_percentile = 1e-3
 
-    # Fold and validation configuration
     valid_id = 1
     batch = 16
     th_percentile = 0.0014109
@@ -45,7 +40,7 @@ class CFG:
 
     # Set relative paths
     model_path = [
-        "C:/Users/thier/Desktop/All_programming/Python/kaggle/SenNet + HOA/se_resnext50_32x4d_26_loss0.10_score0.90_val_loss0.12_val_score0.88_midd_1024.pt",  # 8e-5-27-rot0-5
+        "C:/Users/thier/Desktop/All_programming/Python/kaggle/SenNet + HOA/models/se_resnext50_32x4d_26_loss0.10_score0.90_val_loss0.12_val_score0.88_midd_1024.pt",  # 8e-5-27-rot0-5
     ]
 
 # Custom model class definition
