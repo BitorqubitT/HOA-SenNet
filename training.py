@@ -23,6 +23,10 @@ p_augm = 0.05 #0.5
 
 # TODO:
 # Check dotenv class -> alternatives?
+# Add folder for models
+# Check out one of these models
+# clean code
+# change params
 
 class CFG:
     # ============== pred target =============
@@ -42,7 +46,7 @@ class CFG:
     train_batch_size = 1 #4 #16
     valid_batch_size = train_batch_size * 2
 
-    epochs = 25 #27 #30 #25
+    epochs = 2 #25 #27 #30 #25
     lr = 8e-5
     chopping_percentile=1e-3
     # ============== fold =============
