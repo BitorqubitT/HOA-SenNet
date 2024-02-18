@@ -1,5 +1,3 @@
-#!mkdir -p /root/.cache/torch/hub/checkpoints/
-#!cp /kaggle/input/se-net-pretrained-imagenet-weights/* /root/.cache/torch/hub/checkpoints/
 import torch as tc 
 import torch.nn as nn  
 import numpy as np
@@ -8,7 +6,6 @@ import os,sys,cv2
 from torch.cuda.amp import autocast
 import matplotlib.pyplot as plt
 import albumentations as A
-#!python -m pip install --no-index --find-links=/kaggle/input/pip-download-for-segmentation-models-pytorch segmentation-models-pytorch
 import segmentation_models_pytorch as smp
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset, DataLoader
@@ -18,8 +15,7 @@ import helper
 
 tc.cuda.is_available()
 
-p_augm = 0.05 #0.5
-#add rotate.  less p_augm
+p_augm = 0.05 
 
 # TODO:
 # Check dotenv class -> alternatives?
@@ -27,29 +23,29 @@ p_augm = 0.05 #0.5
 # Check out one of these models
 # clean code
 # change params
+# Add spaces
 
 class CFG:
-    # ============== pred target =============
     target_size = 1
 
-    # ============== model CFG =============
     model_name = 'Unet'
-    # Differrent training models?
     backbone = 'se_resnext50_32x4d'
 
-    # Change to 5 for 3d?
-    in_chans = 1   #5 # 65
-    # ============== training CFG =============
+    # 2, 2.5d>?
+    in_chans = 1
+    
+    # Only use 512 for inference or also for training?
+    # Difference in training speed?
+    # Check val score diff
     image_size = 1024 # 512 # 512
     input_size = 1024 # 512 #=512
 
-    train_batch_size = 1 #4 #16
+    train_batch_size = 1
     valid_batch_size = train_batch_size * 2
 
     epochs = 2 #25 #27 #30 #25
     lr = 8e-5
     chopping_percentile=1e-3
-    # ============== fold =============
     valid_id = 1
 
     # ============== augmentation =============
@@ -131,22 +127,17 @@ def load_data(paths,is_label=False):
     x=tc.cat(data,dim=0)
     del data
     if not is_label:
-        ########################################################################
         TH=x.reshape(-1).numpy()
         index = -int(len(TH) * CFG.chopping_percentile)
         TH:int = np.partition(TH, index)[index]
         x[x>TH]=int(TH)
-        ########################################################################
         TH=x.reshape(-1).numpy()
         index = -int(len(TH) * CFG.chopping_percentile)
         TH:int = np.partition(TH, -index)[-index]
         x[x<TH]=int(TH)
-        ########################################################################
         x=(helper.min_max_normalization(x.to(tc.float16)[None])[0]*255).to(tc.uint8)
     return x
 
-
-#https://www.kaggle.com/code/kashiwaba/sennet-hoa-train-unet-simple-baseline
 def dice_coef(y_pred:tc.Tensor,y_true:tc.Tensor, thr=0.5, dim=(-1,-2), epsilon=0.001):
     y_pred=y_pred.sigmoid()
     y_true = y_true.to(tc.float32)
@@ -223,7 +214,7 @@ class Kaggld_Dataset(Dataset):
                     x=x.flip(dims=(i,))
                     if i>=1:
                         y=y.flip(dims=(i-1,))
-        return x,y#(uint8,uint8)
+        return x,y
 
 if __name__ == "__main__":
     import ssl
