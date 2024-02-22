@@ -4,26 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# Function to resize image to 1024x1024 without rotation
-def to_1024_no_rot(img, image_size=1024):
-    if image_size > img.shape[0]:
-        # Calculate padding for top and bottom
-        start1 = (image_size - img.shape[0]) // 2
-        top = img[0: start1, 0: img.shape[1]]
-        bottom = img[img.shape[0] - start1: img.shape[0], 0: img.shape[1]]
-        
-        # Concatenate top, image, and bottom
-        img_result = np.concatenate((top, img, bottom), axis=0)
-    else:
-        img_result = img
-    
-    return img_result
-
-# Function to resize image to 1024x1024 using to_1024 function
-def to_1024_1024(img, CFG, image_size=1024):
-    img_result = to_1024(img, CFG, image_size)
-    return img_result
-
 # Function to resize image back to original size
 def to_original(im_after, img, image_size=1024):
     top_ = 0
@@ -42,7 +22,6 @@ def to_original(im_after, img, image_size=1024):
         img_result = im_after[top_: img.shape[0] + top_, left_: img.shape[1] + left_]
     else:
         img_result = im_after
-    
     return img_result
 
 # Function to encode a binary mask using Run-Length Encoding (RLE)
@@ -58,7 +37,6 @@ def rle_encode(mask):
 
 # Function for min-max normalization of a Pytc tensor
 def min_max_normalization(x: tc.Tensor) -> tc.Tensor:
-    """input.shape=(batch,f1,...)"""
     shape = x.shape
     if x.ndim > 2:
         x = x.reshape(x.shape[0], -1)
@@ -93,7 +71,7 @@ def add_edge(x: tc.Tensor, edge: int):
     return x
 
 # Function to resize image to 1024x1024 with rotation
-def to_1024(img, CFG, image_size=1024):
+def to_1024_1024(img, CFG, image_size=1024):
     if image_size > img.shape[1]:
         # Rotate image 90 degrees
         img = np.rot90(img)
@@ -130,6 +108,16 @@ def add_noise(x:tc.Tensor,max_randn_rate=0.1,randn_rate=None,x_already_normed=Fa
     cache=(x_std**2+(x_std*randn_rate)**2)**0.5
     return (x-x_mean+tc.randn(size=x.shape,device=x.device,dtype=x.dtype)*randn_rate*x_std)/(cache+1e-7)
  
+
+def dice_coef(y_pred:tc.Tensor,y_true:tc.Tensor, thr=0.5, dim=(-1,-2), epsilon=0.001):
+    y_pred=y_pred.sigmoid()
+    y_true = y_true.to(tc.float32)
+    y_pred = (y_pred>thr).to(tc.float32)
+    inter = (y_true*y_pred).sum(dim=dim)
+    den = y_true.sum(dim=dim) + y_pred.sum(dim=dim)
+    dice = ((2*inter+epsilon)/(den+epsilon)).mean()
+    return dice
+
 
 # based on:
 # https://github.com/kevinzakka/pytc-goodies/blob/master/losses.py

@@ -30,9 +30,7 @@ HEIGHT = 500
 
 # TODO:
 
-# Check focalboard
-
-#check if i can convert the type to something which uses less memory.
+#check if i can convert the type to something which uses less memory. (flt? int16?)
 #https://github.com/plotly/dash-slicer/blob/main/dash_slicer/slicer.py
 # read performance tips (chat?).
 # How much do I want to load in memory
@@ -223,7 +221,6 @@ def create_histo(step_size, threshold, slice_slider):
     # What happens when i put this in memory so we dont have to compute everytime?
     # We actually only have to recopmute when we touch step_size etc.
     # Is this what we are doing now or not?
-
     labels_folder_path = 'D:/data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
     label_images = []
     for file in sorted(os.listdir(labels_folder_path))[100:900]:
