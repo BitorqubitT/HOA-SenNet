@@ -18,7 +18,6 @@ from dash import dcc
 import tifffile
 import torch
 
-#import helper
 
 external_stylesheets = [dbc.themes.BOOTSTRAP, '/assets/style.css']
 app = dash.Dash(__name__, update_title=None, external_stylesheets=external_stylesheets)
@@ -53,7 +52,6 @@ mesh_card = dbc.Card(
         children = [
         dbc.CardHeader("3D mesh representation of the image data and annotation"),
         dcc.Graph(id="graph-helper"),
-        #dbc.CardBody([dcc.Graph(id="graph-helper", figure=fig_mesh)]),
         ]
     )
     ]
@@ -69,16 +67,6 @@ slice_card = dbc.Card(
     ]
 )
 
-mask_card = dbc.Card(
-    [ dcc.Loading(
-        children = [
-        dbc.CardHeader("2D mask of kidney"),
-        dcc.Graph(id="graph-kidney-msk"),
-        ]
-    )
-    ]
-)
-
 mask_truth_card = dbc.Card(
     [ dcc.Loading(
         children = [
@@ -89,14 +77,14 @@ mask_truth_card = dbc.Card(
     ]
 )
 
-score_card = dbc.Card(
+bar_scores = dbc.Card(
     [ dcc.Loading(
-        id="loading-score",
-        type="default",
-        children=html.Div(id="loading-output-1")
-        )
-    ],
-    className="score-holder"
+        children = [
+        dbc.CardHeader("Overview scores"),
+        dcc.Graph(id="scores_overview"),
+        ]
+    )
+    ]
 )
 
 # check effect of resizing
@@ -165,7 +153,6 @@ slider_kidney = dcc.Slider(
     )
 
 # create two buttons for liver pic
-
 # We can put a body in here, the define the body above which holds: buttons and graph
 # might want to use storesssssssssssssss
 # https://dash.plotly.com/dash-core-components/loading
@@ -191,19 +178,17 @@ app.layout = html.Div(
                     dbc.Row([
                         dbc.Col(html.P(["Choose a slice height:"]), width=3),
                         dbc.Col(slider_kidney, width=4)
-                    ]),
-                    dbc.Row([
-                        dbc.Col(html.P(["Score:"]), width=3),
-                        dbc.Col(score_card, width=4)
-                        #dbc.Col(html.Span(id='output-score', children=''), width=4)
                     ])
                 ])
             ], className="row-spacing"),
 
-            dbc.Row([dbc.Col(slice_card, width = 3),
-                     dbc.Col(mask_card, width = 3),
-                     dbc.Col(mask_truth_card, width = 3)
-                    ]),
+            dbc.Row([
+                dbc.Col(slice_card, width = 4),
+                dbc.Col(mask_truth_card, width = 4)
+                ]),
+
+            dbc.Row([dbc.Col(bar_scores, width = 9)
+            ]),
             ],
             fluid=True,
         ),
@@ -286,19 +271,6 @@ def create_liver_msk2(slice_number):
     return fig
 
 @app.callback(
-    Output("graph-kidney-msk", "figure"),
-    [Input("slice_slider", "value")],
-)
-def create_liver_msk2(slice_number):
-    # Find better way to preload
-    img = x[slice_number]
-    fig = px.imshow(img, width=450, height=750)
-    fig.update_layout(coloraxis_showscale=False)
-    fig.update_xaxes(showticklabels=False)
-    fig.update_yaxes(showticklabels=False)
-    return fig
-
-@app.callback(
     Output("graph-kidney-msk-truth", "figure"),
     [Input("slice_slider", "value")],
 )
@@ -312,11 +284,20 @@ def create_liver_msk2(slice_number):
     return fig
 
 @app.callback(
-    Output("loading-score", "children"),
+    Output("scores_overview", "figure"),
     [Input("slice_slider", "value")]
 )
-def score_calc(value):
-    return str(value)
+def scores(value):
+    x = ['A', 'B', 'C', 'D']
+    y = [3, 5, 7, 9]
+    print(" we hawtadjaopiwnjd")
+    fig = go.Figure(layout={})
+    fig.add_bar(x=x, y=y)
+    return fig
+
+
+
+
 
 if __name__ == "__main__":
     app.run_server(debug=True, dev_tools_props_check=False)

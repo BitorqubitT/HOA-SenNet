@@ -32,7 +32,7 @@ class CFG:
     train_batch_size = 1
     valid_batch_size = train_batch_size * 2
 
-    epochs = 1
+    epochs = 30
     lr = 8e-5
     weight_decay = 1e-2
     chopping_percentile=1e-3
@@ -254,9 +254,9 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             scheduler.step()
             # sub in different score function
-            score=helper.dice_coef(pred.detach(),y)
-            losss=(losss * i + loss.item())/(i + 1)
-            scores=(scores * i + score)/(i + 1)
+            score = helper.dice_coef(pred.detach(),y)
+            losss = (losss * i + loss.item())/(i + 1)
+            scores = (scores * i + score)/(i + 1)
             time.set_description(f"epoch:{epoch},loss:{losss:.4f},score:{scores:.4f},lr{optimizer.param_groups[0]['lr']:.4e}")
             time.update()
             del loss, pred

@@ -108,16 +108,14 @@ def add_noise(x:tc.Tensor,max_randn_rate=0.1,randn_rate=None,x_already_normed=Fa
     cache=(x_std**2+(x_std*randn_rate)**2)**0.5
     return (x-x_mean+tc.randn(size=x.shape,device=x.device,dtype=x.dtype)*randn_rate*x_std)/(cache+1e-7)
  
-
 def dice_coef(y_pred:tc.Tensor,y_true:tc.Tensor, thr=0.5, dim=(-1,-2), epsilon=0.001):
-    y_pred=y_pred.sigmoid()
+    y_pred = y_pred.sigmoid()
     y_true = y_true.to(tc.float32)
-    y_pred = (y_pred>thr).to(tc.float32)
-    inter = (y_true*y_pred).sum(dim=dim)
-    den = y_true.sum(dim=dim) + y_pred.sum(dim=dim)
-    dice = ((2*inter+epsilon)/(den+epsilon)).mean()
+    y_pred = (y_pred > thr).to(tc.float32)
+    inter = (y_true * y_pred).sum(dim = dim)
+    den = y_true.sum(dim = dim) + y_pred.sum(dim = dim)
+    dice = ((2 * inter + epsilon)/(den + epsilon)).mean()
     return dice
-
 
 # based on:
 # https://github.com/kevinzakka/pytc-goodies/blob/master/losses.py
