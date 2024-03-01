@@ -15,7 +15,7 @@ This repository contains the code for this dash app and the inference and traini
 ![](show-visual.gif)
 
 ## Credits
-The competition organisors, kaggle and everyone who participated.
+The competition organisers, kaggle and everyone who participated.
 https://www.kaggle.com/competitions/blood-vessel-segmentation
 https://www.kaggle.com/code/yoyobar/2-5d-cutting-model-baseline-training/notebook
 https://dash.gallery
