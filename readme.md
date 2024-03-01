@@ -5,12 +5,14 @@ During participating in the SenNet + HOA competition on kaggle, I created a dash
 This repository contains the code for this dash app and the inference and training model that I used.
 
 ## Installation
-pip install -r requirements.txt
-You can find the data at https://www.kaggle.com/competitions/blood-vessel-segmentation
+- pip install -r requirements.txt
+- You can find the data at https://www.kaggle.com/competitions/blood-vessel-segmentation
 
 ## Features
 - Dash app which takes in segmentations and recreates a 3d volume using marching cubes.
 - Training and inference scipts which perform segmentation task on TIFF images.
+
+![](show-visual.gif)
 
 ## Credits
 The competition organisors, kaggle and everyone who participated.
