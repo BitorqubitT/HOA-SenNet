@@ -31,9 +31,8 @@ class CFG:
 
     valid_id = 1
     batch = 16
-    th_percentile = 0.0014109
+    th_percentile = 0.0014109  # Threshold percentage
     axis_w = [0.328800989, 0.336629584, 0.334569427]
-    axis_second_model = 0
 
     # Set relative paths
     model_path = [
@@ -69,9 +68,12 @@ class CustomModel(nn.Module):
             x = nn.functional.interpolate(x, size=(CFG.input_size, CFG.input_size), mode='bilinear', align_corners=True)
         
         shape = x.shape
+
+        # rotate img
         x = [tc.rot90(x, k=i, dims=(-2, -1)) for i in range(4)]
         x = tc.cat(x, dim=0)
         
+        # Use this for mp training
         with autocast():
             with tc.no_grad():
                 x = [self.forward_(x[i * self.batch:(i + 1) * self.batch]) for i in range(x.shape[0] // self.batch + 1)]
@@ -142,6 +144,7 @@ class Pipeline_Dataset(Dataset):
         self.img_paths = glob(path + "/images/*")
         self.img_paths.sort()
         self.in_chan = CFG.in_chans
+        # Add padding
         z = tc.zeros(self.in_chan // 2, *x.shape[1:], dtype=x.dtype)
         self.x = tc.cat((z, x, z), dim=0)
 
@@ -180,9 +183,7 @@ def get_output(debug):
         labels = tc.zeros_like(x, dtype=tc.uint8)
         mark = Pipeline_Dataset(x, path).get_marks()
 
-        # Loop through each axis
         for axis in [0, 1, 2]:
-
             # Rotate input data based on the current axis
             if axis == 0:
                 x_ = x
@@ -198,7 +199,6 @@ def get_output(debug):
             if x.shape[0] == 3 and axis != 0:
                 break
 
-            # Create dataset and dataloader for processing
             dataset = Pipeline_Dataset(x_, path)
             dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
             shape = dataset.x.shape[-2:]
@@ -207,7 +207,6 @@ def get_output(debug):
             x1_list = np.arange(0, shape[0] + CFG.tile_size - CFG.tile_size + 1, CFG.stride)
             y1_list = np.arange(0, shape[1] + CFG.tile_size - CFG.tile_size + 1, CFG.stride)
 
-            # Loop through each image in the dataloader
             for img, index in tqdm(dataloader):
                 img = img.to("cuda:0")
                 img = helper.add_edge(img[0], CFG.tile_size // 2)[None]
@@ -217,7 +216,7 @@ def get_output(debug):
 
                 indexs = []
                 chip = []
-                # What is happening in chip, these are the tiles right?
+                # Loop over the tiles to predict
                 for y1 in y1_list:
                     for x1 in x1_list:
                         x2 = x1 + CFG.tile_size
@@ -274,7 +273,7 @@ if __name__ == "__main__":
     submission_df = []
     debug_count = 0
 
-    # Loop through each prediction and generate RLE encoding
+    # Generate RLE encoding for each prediction
     for index in range(len(ids)):
         id = ids[index]
         i = 0
@@ -290,14 +289,11 @@ if __name__ == "__main__":
         # Extract the binary mask based on the threshold
         mask_pred = (output[i][index] > TH).numpy()
 
-        # Convert the binary mask to the original size
         mask_pred2 = helper.to_original(mask_pred, img, image_size=1024)
         mask_pred = mask_pred2.copy()
 
-        # Encode the binary mask using Run-Length Encoding
         rle = helper.rle_encode(mask_pred)
 
-        # Append information to the submission dataframe
         submission_df.append(
             pd.DataFrame(data={
                 'id': id,
@@ -305,7 +301,6 @@ if __name__ == "__main__":
             }, index=[0])
         )
 
-    # Concatenate the submission dataframes and save to a CSV file
     submission_df = pd.concat(submission_df)
     submission_df.to_csv('submission.csv', index=False)
     submission_df.head(6)
