@@ -20,7 +20,7 @@ server = app.server
 # TODO:
 # check convert the type to something which uses less memory. (int16?)
 
-# ------------- Define App Layout ---------------------------------------------------
+# Create cards which hold graphs etc.
 
 mesh_card = dbc.Card(
     [ dcc.Loading(
@@ -64,10 +64,11 @@ bar_scores = dbc.Card(
     ]
 )
 
+# Pre load functions
 def pre_load_image():
     labels_folder_path = './data/train/kidney_3_sparse/images/' 
     label_images = []
-    for file in sorted(os.listdir(labels_folder_path))[100:950]:
+    for file in sorted(os.listdir(labels_folder_path))[0:950]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
             label_image = label_image[0::4, 0::4]
@@ -77,9 +78,9 @@ def pre_load_image():
     return x
 
 def pre_load_label():
-    labels_folder_path = './data/train/kidney_3_sparse/labels/'
+    labels_folder_path = './data/results/'
     label_images = []
-    for file in sorted(os.listdir(labels_folder_path))[100:950]:
+    for file in sorted(os.listdir(labels_folder_path))[0:950]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
             label_image = label_image[0::4, 0::4]
@@ -95,9 +96,9 @@ def pre_load_slice_scores():
 def pre_load_masked_images():
     # create function maybe use dcc loader
     # Can combine this function with pre_load_label
-    labels_folder_path = './data/train/kidney_3_sparse/labels'  # Adjust the path accordingly
+    labels_folder_path = './data/train/kidney_3_sparse/labels'
     label_images = []
-    for file in sorted(os.listdir(labels_folder_path))[100:900]:
+    for file in sorted(os.listdir(labels_folder_path))[0:950]:
         if file.endswith(".tif"):
             label_image = tifffile.imread(os.path.join(labels_folder_path, file))
             label_image_downsampled = label_image[::1, ::1]
@@ -110,10 +111,11 @@ def pre_load_masked_images():
 # load data, so we only do it once.
 med_img = pre_load_masked_images()
 x = pre_load_image()
-xz = pre_load_label()
+labels = pre_load_label()
 scores = pre_load_slice_scores()
 colors = ["blue"] * len(scores)
 
+# create all buttons
 button_stepsize = dcc.Dropdown(
     id = "set_stepsize",
     options = [{"label": str(i), "value": i}
@@ -205,7 +207,7 @@ def create_histo(step_size, threshold, slice_slider):
     Output("graph-kidney", "figure"),
     [Input("slice_slider", "value")],
 )
-def create_liver_msk2(slice_number):
+def create_liver_img(slice_number):
     img = x[slice_number]
     fig = px.imshow(img)
     fig.update_layout(coloraxis_showscale=False)
@@ -219,7 +221,7 @@ def create_liver_msk2(slice_number):
     [Input("slice_slider", "value")],
 )
 def create_liver_msk2(slice_number):
-    img = xz[slice_number]
+    img = labels[slice_number]
     fig = px.imshow(img)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_layout(margin={"t": 10, "b": 10, "r": 0, "l": 0, "pad": 0},)
