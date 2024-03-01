@@ -15,9 +15,10 @@ import ssl
 from dotenv import load_dotenv
 
 ssl._create_default_https_context = ssl._create_unverified_context
+# Should be run on gpu, test if available
 tc.cuda.is_available()
-# Diceloss smooth factor to 0.1 (what does it do?)
-# Save the params
+
+#TODO:
 # Bigger image size + lower precision maybe?
 
 class CFG:
@@ -116,6 +117,7 @@ def load_data(paths, is_label=False):
     x = tc.cat(data,dim=0)
     del data
     if not is_label:
+        # Normalize data and clip if not label
         TH = x.reshape(-1).numpy()
         index = -int(len(TH) * CFG.chopping_percentile)
         TH:int = np.partition(TH, index)[index]
@@ -124,7 +126,7 @@ def load_data(paths, is_label=False):
         index = -int(len(TH) * CFG.chopping_percentile)
         TH:int = np.partition(TH, -index)[-index]
         x[x<TH] = int(TH)
-        x=(helper.min_max_normalization(x.to(tc.float16)[None])[0]*255).to(tc.uint8)
+        x = (helper.min_max_normalization(x.to(tc.float16)[None])[0]*255).to(tc.uint8)
     return x
 
 class DiceLoss(nn.Module):
@@ -137,7 +139,7 @@ class DiceLoss(nn.Module):
         targets = targets.view(-1)
         
         intersection = (inputs * targets).sum()                            
-        dice = (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
+        dice = (2.0 * intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
         
         return 1 - dice
 
@@ -158,7 +160,7 @@ class Kaggld_Dataset(Dataset):
         return sum([y.shape[0] - self.in_chans for y in self.y])
     
     def __getitem__(self,index):
-        i=0
+        i = 0
         for x in self.x:
             if index > x.shape[0]-self.in_chans:
                 index -= x.shape[0]-self.in_chans
@@ -170,36 +172,41 @@ class Kaggld_Dataset(Dataset):
         
         print(f'x.shape[1] ={x.shape[1]}    x.shape[2]={x.shape[2]}')
         
-        x_index= (x.shape[1] - self.image_size)//2
-        y_index= (x.shape[2] - self.image_size)//2
-        x=x[index:index+self.in_chans, x_index:x_index+self.image_size, y_index:y_index+self.image_size]
-        y=y[index+self.in_chans//2, x_index:x_index+self.image_size, y_index:y_index+self.image_size]
+        # Start indice for crop
+        x_index = (x.shape[1] - self.image_size)//2
+        y_index = (x.shape[2] - self.image_size)//2
+
+        # Crop the input and target data
+        x = x[index:index+self.in_chans, x_index:x_index+self.image_size, y_index:y_index+self.image_size]
+        y = y[index+self.in_chans//2, x_index:x_index+self.image_size, y_index:y_index+self.image_size]
 
         data = self.transform(image=x.numpy().transpose(1,2,0), mask=y.numpy())
         x = data['image']
         y = data['mask']>=127
-        if self.arg:
-            i=np.random.randint(4)
-            x=x.rot90(i,dims=(1,2))
-            y=y.rot90(i,dims=(0,1))
+        # Should remove this aug?
+        """ if self.arg:
+            i = np.random.randint(4)
+            x = x.rot90(i, dims=(1,2))
+            y = y.rot90(i, dims=(0,1))
             for i in range(3):
                 if np.random.randint(2):
                     x=x.flip(dims=(i,))
-                    if i>=1:
-                        y=y.flip(dims=(i-1,))
+                    if i >= 1:
+                        y = y.flip(dims=(i-1,))
+        """
         return x, y
 
 if __name__ == "__main__":
     train_x=[]
     train_y=[]
 
-    root_path="D:/data/"
-    parhs=["D:/data/train/kidney_1_dense"]
-    for i,path in enumerate(parhs):
+    root_path = "D:/data/"
+    part_path = ["D:/data/train/kidney_1_dense"]
+    for i, path in enumerate(part_path):
         if path=="D:/data/train/kidney_3_dense":
             continue
-        x=load_data(glob(f"{path}/images/*"),is_label=False)
-        y=load_data(glob(f"{path}/labels/*"),is_label=True)
+        x = load_data(glob(f"{path}/images/*"),is_label=False)
+        y = load_data(glob(f"{path}/labels/*"),is_label=True)
         train_x.append(x)
         train_y.append(y)
         train_x.append(x.permute(1,2,0))
@@ -216,8 +223,8 @@ if __name__ == "__main__":
     tc.backends.cudnn.enabled = True
     tc.backends.cudnn.benchmark = True
         
-    train_dataset = Kaggld_Dataset(train_x,train_y,arg=True)
-    train_dataset = DataLoader(train_dataset, batch_size=CFG.train_batch_size ,num_workers=2, shuffle=True, pin_memory=True)
+    train_dataset = Kaggld_Dataset(train_x, train_y, arg=True)
+    train_dataset = DataLoader(train_dataset, batch_size=CFG.train_batch_size, num_workers=2, shuffle=True, pin_memory=True)
     val_dataset = Kaggld_Dataset([val_x],[val_y])
     val_dataset = DataLoader(val_dataset, batch_size=CFG.valid_batch_size, num_workers=2, shuffle=False, pin_memory=True)
 
@@ -270,6 +277,7 @@ if __name__ == "__main__":
             y = y.cuda().to(tc.float32)
             x = helper.norm_with_clip(x.reshape(-1,*x.shape[2:])).reshape(x.shape)
 
+            # MP ?
             with autocast():
                 with tc.no_grad():
                     pred = model(x)
