@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 import cv2
 from glob import glob
-import matplotlib.pyplot as plt
 import pandas as pd
 
 import segmentation_models_pytorch as smp
@@ -41,7 +40,6 @@ class CFG:
         "C:/Users/thier/Desktop/All_programming/Python/kaggle/SenNet + HOA/models/se_resnext50_32x4d_26_loss0.10_score0.90_val_loss0.12_val_score0.88_midd_1024.pt"
     ]
 
-# Custom model class definition
 class CustomModel(nn.Module):
     def __init__(self, CFG, weight=None):
         super().__init__()
@@ -66,7 +64,7 @@ class CustomModel(nn.Module):
         x = x.to(tc.float32)
         x = helper.norm_with_clip(x.reshape(-1, *x.shape[2:])).reshape(x.shape)
         
-        # Interpolating the input tensor if input size is not equal to image size
+        # Interpolate depending on image size
         if CFG.input_size != CFG.image_size:
             x = nn.functional.interpolate(x, size=(CFG.input_size, CFG.input_size), mode='bilinear', align_corners=True)
         
@@ -93,9 +91,8 @@ class CustomModel(nn.Module):
 def build_model(weight=None):
     load_dotenv()
 
-    print('model_name', CFG.model_name)
-    print('backbone', CFG.backbone)
-
+    print(f'model_name {CFG.model_name}')
+    print(f'backbone {CFG.backbone}')
     model = CustomModel(CFG, weight)
 
     return model.cuda()
@@ -129,7 +126,6 @@ def load_data(path, s):
         data.append(x)
     x = tc.cat(data, dim=0)
     
-    # Chopping values above and below a certain percentile
     TH = x.reshape(-1).numpy()
     index = -int(len(TH) * CFG.chopping_percentile)
     TH: int = np.partition(TH, index)[index]
@@ -171,7 +167,7 @@ class Pipeline_Dataset(Dataset):
 def get_output(debug):
     outputs = []
 
-    # Specify paths for testing
+    # Switch data when testing.
     if debug:
         paths = ["D:/data/train/kidney_2"]
     else:
@@ -179,9 +175,7 @@ def get_output(debug):
 
     outputs = [[], []]
 
-    # Loop through each path
     for path in paths:
-        # Load data and initialize labels
         x = load_data(path, "/images/")
         labels = tc.zeros_like(x, dtype=tc.uint8)
         mark = Pipeline_Dataset(x, path).get_marks()
@@ -234,7 +228,7 @@ def get_output(debug):
 
                 # Get predictions from the model
                 y_preds = model.forward(tc.cat(chip)).to(device=0)
-                # Weighted Ensemble
+                
                 # Adjust for drop_edge_pixel
                 if CFG.drop_egde_pixel:
                     y_preds = y_preds[..., CFG.drop_egde_pixel:-CFG.drop_egde_pixel,
@@ -265,16 +259,16 @@ if __name__ == "__main__":
     model.eval()
     model = DataParallel(model)
 
-    # Get segmentation output and associated ids
     # (not is_submit)
     output, ids = get_output(False)
+
     # Calculate threshold for binary predictions
     TH = [x.flatten().numpy() for x in output]
     TH = np.concatenate(TH)
     index = -int(len(TH) * CFG.th_percentile)
     TH: int = np.partition(TH, index)[index]
 
-    # Read an example image for visualization
+    # Read an example image to check input size later
     img = cv2.imread("D:/data/test/kidney_5/images/0001.tif", cv2.IMREAD_GRAYSCALE)
 
     submission_df = []

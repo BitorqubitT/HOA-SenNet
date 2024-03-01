@@ -1,12 +1,11 @@
 """Surface Dice metric for HuBMAP 4."""
-"""Taken from https://www.kaggle.com/code/metric/surface-dice-metric/notebook"""
+"""Adapted from https://www.kaggle.com/code/metric/surface-dice-metric/notebook"""
 import numpy as np
 import pandas as pd
-import pandas.api.types
 from numba import jit
 from scipy.ndimage import label, generate_binary_structure
 from skimage.transform import resize
-from typing import Optional, Tuple, Union
+from typing import Optional
 
 class ParticipantVisibleError(Exception):
     pass
@@ -1311,16 +1310,34 @@ def distance_transform_edt(img, output=np.float32, scale=1):
         if s==0:break
     return dis[(slice(1,-1),)*img.ndim]
 
-solution = pd.DataFrame({
-'id': [0, 1, 2, 3, 4],
-'rle': ['1 12', '1 12 ', '1 12', '20 5', '22 2'],
-'width': [5, 5, 5, 8, 8],
-'height': [5, 5, 5, 4, 4],
-'group': ['a', 'a', 'a', 'b', 'b'],
-'slice': [0, 1, 2, 0, 1],
-})
-submission = pd.DataFrame({
-'id': [0, 1, 2, 3, 4],
-'rle': ['1 12', '1 12 ', '1 12', '20 5', '22 2'],
-})
-print(score(solution, submission, 'id', 'rle', 0.0, 'group', 'slice'))
+
+if __name__ == "__main__":
+    solutions = pd.read_csv("solutions.csv")
+    submissions = pd.read_csv("submissions.csv")
+
+    all_scores = []
+
+    # Get score per slice for graph 
+    for i, row in solutions.iterrows():
+        solution = pd.DataFrame({
+                                'id': [i],
+                                'rle': [row["rle"]],
+                                'width': [1024],
+                                'height': [1024],
+                                'group': ['a'],
+                                'slice': [0],
+                                })
+                                
+        submission = pd.DataFrame({
+                                'id': [i],
+                                'rle': [submissions["rle"]],
+                                })
+
+        all_scores.append(score(solution, submission, 'id', 'rle', 0.0, 'group', 'slice'))
+
+    results = pd.DataFrame({"scores": all_scores})
+    results.to_csv("scores_per_slice.csv")
+
+
+
+

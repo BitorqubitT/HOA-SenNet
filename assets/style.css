@@ -18,6 +18,14 @@
     width: 50%;
 }
 
+.pic_card {
+    height: 40%;
+}
+
+.test {
+    height: 40%;
+}
+
 body {
     background-color: #f0f0f0; /* Set the background color to black */
 }

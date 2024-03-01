@@ -1,7 +1,4 @@
 import torch as tc
-from typing import Optional
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 
 # Function to resize image back to original size

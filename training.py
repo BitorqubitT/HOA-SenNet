@@ -2,9 +2,8 @@ import torch as tc
 import torch.nn as nn  
 import numpy as np
 from tqdm import tqdm
-import os,sys,cv2
+import cv2
 from torch.cuda.amp import autocast
-import matplotlib.pyplot as plt
 import albumentations as A
 import segmentation_models_pytorch as smp
 from albumentations.pytorch import ToTensorV2
@@ -13,6 +12,7 @@ from torch.nn.parallel import DataParallel
 from glob import glob
 import helper
 import ssl
+from dotenv import load_dotenv
 
 ssl._create_default_https_context = ssl._create_unverified_context
 tc.cuda.is_available()
@@ -78,12 +78,10 @@ class CustomModel(nn.Module):
         return output[:,0]#.sigmoid()
 
 def build_model(weight="imagenet"):
-    from dotenv import load_dotenv
     load_dotenv()
 
     print(f'model_name {CFG.model_name}')
     print(f'backbone {CFG.backbone}')
-
     model = CustomModel(CFG, weight)
 
     return model.cuda()
