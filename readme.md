@@ -10,7 +10,7 @@ This repository contains the code for this dash app and the inference and traini
 
 ## Features
 - Dash app which takes in segmentations and recreates a 3d volume using marching cubes.
-- Training and inference scipts which perform segmentation task on TIFF images.
+- Training and inference scripts, which perform segmentation task on TIFF images.
 
 ![](show-visual.gif)
 
